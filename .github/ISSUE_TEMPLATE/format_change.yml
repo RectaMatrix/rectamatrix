@@ -1,0 +1,31 @@
+name: Format change proposal
+description: Propose a change to encoded Version 1 semantics or a future version
+title: "format: "
+labels: [format-proposal]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What interoperability or format limitation should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed encoding rule
+      description: Define deterministic writer and reader behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration
+      description: Explain effects on existing symbols and decoders.
+    validations:
+      required: true
+  - type: textarea
+    id: vectors
+    attributes:
+      label: Conformance evidence
+      description: Describe the vectors or independent implementations that can verify it.

@@ -1,188 +1,137 @@
-# RectaMatrix TypeScript Reference Implementation
+# RectaMatrix
 
-This directory contains the developing official TypeScript reference
-implementation of the RectaMatrix 2D barcode specification.
+[![CI](https://github.com/RectaMatrix/rectamatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/RectaMatrix/rectamatrix/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/format-candidate%201-orange.svg)](spec/RECTAMATRIX-SPEC-v1.0-EN.md)
 
-RectaMatrix is a new rectangular binary matrix code. The technology is not yet
-widely supported, so encoded symbols should currently be used together with a
-compatible decoder and the published conformance vectors.
+RectaMatrix is an experimental rectangular binary 2D barcode with a fixed 3:2
+aspect ratio. This repository contains the format specification, the official
+TypeScript reference implementation, conformance vectors, examples, and an
+interactive browser demo.
 
-## Status
+> [!IMPORTANT]
+> RectaMatrix is currently **Format Candidate 1**, not a stable industry
+> standard. Symbols should be used together with a compatible RectaMatrix
+> decoder. Format changes remain possible before the first stable release.
 
-The deterministic Version 1 codec and its canonical sampled-matrix conformance
-suites are implemented. The repository currently contains:
+## At a glance
 
-- the monorepo and package boundaries;
-- machine-readable Version 1 constants and calculated capacities;
-- geometry, reserved-module, Micro-Anchor, Clocking, and scan-order primitives;
-- bit/byte utilities and strict UTF-8 conversion;
-- CRC-32C;
-- deterministic RM-LZ1 compression and strict decompression;
-- GF(256) arithmetic and polynomial operations;
-- systematic Reed-Solomon encoding and decoding with erasure support;
-- deterministic RS block layout, interleaving, and deinterleaving;
-- Format Header construction, RS protection, correction, and validation;
-- complete deterministic Binary and UTF-8 matrix encoding;
-- dependency-free SVG rendering with a validated Quiet Zone;
-- sampled-matrix decoding with validated module confidences;
-- deterministic Header and Body erasure profiles;
-- RS correction, bounded decompression, CRC validation, and strict UTF-8 output;
-- standardized decode-quality metadata;
-- a DOM-free reference image detector with grayscale conversion, Otsu
-  thresholding, bounded scene-region and quadrilateral discovery, projective
-  sampling, orientation normalization, confidence, inversion support, and
-  image-quality metadata;
-- a browser adapter for bounded Canvas frame capture and managed camera
-  scanning, with explicit stream ownership and cleanup, plus bounded PNG and
-  JPEG rendering;
-- a complete encoder Trace API for normative intermediate values;
-- a strict JSON Schema and runtime validator for encoder vectors;
-- 32 canonical positive encoder vectors covering Unicode, Binary, compression,
-  all geometries, all ECC Levels, and every uncompressed capacity boundary;
-- 19 canonical negative decoder vectors covering malformed geometry,
-  confidence and detector metadata, damaged structural patterns, RS failures,
-  invalid Headers, truncation, CRC, UTF-8, and RM-LZ1 failures;
-- 15 canonical positive decoder vectors covering unknown-error correction,
-  confidence-guided Erasures, all four deterministic Erasure profiles, every
-  ECC Level, compressed UTF-8, detector metadata, and multi-block correction;
-- 22 portable PGM image vectors covering scene placement, automatic and
-  explicit perspective, orientation, local illumination, isolated noise,
-  structured backgrounds, overlapping candidate projections, motion blur,
-  larger reflections, glare, small clutter, contrast, blur, shadow, occlusion,
-  inversion, and negative images;
-- byte-exact, bit-exact, and matrix-exact reproducibility verification.
+| Property         | Current format                                           |
+| ---------------- | -------------------------------------------------------- |
+| Geometry         | Rectangular, 3:2                                         |
+| Symbol sizes     | 24×16 through 144×96 modules (Sizes 0–6)                 |
+| Payloads         | Binary and strict UTF-8 text                             |
+| Error correction | Reed–Solomon over GF(256), four ECC levels               |
+| Compression      | Deterministic RM-LZ1                                     |
+| Quiet Zone       | Standard 4 modules; Compact 2 modules for controlled use |
+| Output           | SVG, PNG, JPEG, and ZPL                                  |
+| Input            | Sampled matrices, image data, and browser camera frames  |
 
-The automatic scene search handles separated planar symbol regions, local
-illumination changes, isolated noise, synthetic structured backgrounds, small
-detached clutter, directional blur, glare, and all four orientations.
-Overlapping candidate projections can be split while both Anchors remain
-visible. Physically overprinted symbols, arbitrary natural photographic
-textures, curved surfaces, and severe motion blur remain future work.
+## Repository map
 
-## Packages
+- [`spec/`](spec/) — English normative specification and German translation.
+- [`packages/`](packages/) — TypeScript encoder, decoder, detector, browser,
+  core, and conformance packages.
+- [`apps/demo/`](apps/demo/) — interactive encoder, export, image decode, and
+  live-camera demo.
+- [`conformance/`](conformance/) — schemas, canonical vectors, and generated
+  interoperability artifacts.
+- [`examples/`](examples/) — focused API examples.
+- [`docs/`](docs/) — architecture, compatibility, conformance, and roadmap.
 
-- `@rectamatrix/core`: deterministic, image-independent primitives.
-- `@rectamatrix/encoder`: deterministic symbol encoding and SVG output.
-- `@rectamatrix/decoder`: sampled-matrix decoding and confidence handling.
-- `@rectamatrix/detector`: RGBA/PGM image sampling and image-to-Payload decoding.
-- `@rectamatrix/browser`: bounded video-frame capture and camera scanning.
-- `@rectamatrix/conformance`: language-neutral vector creation, validation, and
-  verification.
+## Quick start
 
-## Development
-
-Node.js 22 or newer and pnpm are required.
+Requirements: Node.js 22 or newer and pnpm 11.9.0.
 
 ```sh
-pnpm install
+git clone https://github.com/RectaMatrix/rectamatrix.git
+cd rectamatrix
+pnpm install --frozen-lockfile
 pnpm check
+pnpm demo
 ```
 
-Individual commands include `pnpm test`, `pnpm typecheck`, `pnpm lint`,
-`pnpm build`, `pnpm verify:spec`, `pnpm generate:vectors`, and
-`pnpm verify:vectors`.
+The demo is then available at `http://127.0.0.1:5173/`.
 
-Run `pnpm demo` to open the local live-camera demo.
-
-## Encoding
+## Encode and export
 
 ```ts
 import { encodeText, renderSvg, renderZpl } from "@rectamatrix/encoder";
 
-const symbol = encodeText("Grüße – Ελληνικά – 中文 – 😀", {
+const symbol = encodeText("Hello RectaMatrix!", {
   eccLevel: "medium",
   compression: "auto",
 });
 
-const svg = renderSvg(symbol);
+const svg = renderSvg(symbol, { moduleSize: 8 });
+const zpl = renderZpl(symbol, { moduleSize: 8 });
 ```
 
-## Decoding a sampled matrix
+Browser applications can additionally use `renderPng` and `renderJpeg` from
+`@rectamatrix/browser`. See [`examples/`](examples/) for complete samples,
+including a ready-to-save [ZPL label](examples/generate-zpl.ts).
+
+## Decode
 
 ```ts
 import { decodeSampledSymbol } from "@rectamatrix/decoder";
 
-const result = decodeSampledSymbol({
-  modules: symbol.matrix,
-  // confidence: optional matrix of finite values in [0, 1]
-});
-
+const result = decodeSampledSymbol({ modules: symbol.matrix });
 if (result.ok && result.type === "utf8") {
   console.log(result.text, result.metadata.quality);
 }
 ```
 
-## Decoding image data
+Use `@rectamatrix/detector` for RGBA/PGM image data and
+`@rectamatrix/browser` for managed camera scanning.
 
-```ts
-import { decodeImageData, parsePortableGraymap } from "@rectamatrix/detector";
+## Packages
 
-const image = parsePortableGraymap(pgmBytes);
-const result = decodeImageData(image, {
-  maximumCandidates: 48,
-  minimumModulePixels: 3,
-});
+| Package                    | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `@rectamatrix/core`        | Format constants, geometry, compression, CRC, and Reed–Solomon primitives |
+| `@rectamatrix/encoder`     | Binary/text encoding, trace data, SVG, and ZPL output                     |
+| `@rectamatrix/decoder`     | Sampled-matrix decoding and confidence-guided erasures                    |
+| `@rectamatrix/detector`    | Image detection, projective sampling, and image decoding                  |
+| `@rectamatrix/browser`     | Canvas export, video capture, and camera scanning                         |
+| `@rectamatrix/conformance` | Language-neutral vector validation and verification                       |
 
-if (result.ok) {
-  console.log(result.bytes, result.vision.orientationDegrees);
-}
+The packages intentionally remain private during the format-candidate phase.
+Preview releases are distributed as source and conformance archives on GitHub;
+no npm stability promise is made yet.
+
+## Specification and conformance
+
+The [English Version 1 specification](spec/RECTAMATRIX-SPEC-v1.0-EN.md) is
+normative. The [German specification](spec/RECTAMATRIX-SPEC-v1.0-DE.md) is an
+informative translation.
+
+The current suite contains 95 canonical artifacts: 38 encoder vectors, 15
+positive decoder vectors, 19 negative decoder vectors, and 23 portable image
+vectors. `pnpm verify:vectors` performs byte-, bit-, and matrix-exact
+verification.
+
+See [Compatibility](docs/COMPATIBILITY.md) before persisting symbols and
+[Conformance](docs/CONFORMANCE.md) before claiming interoperability.
+
+## Development
+
+```sh
+pnpm check          # formatting, lint, types, tests, spec, and vectors
+pnpm build          # build all packages and the demo
+pnpm release:check  # full release gate
 ```
 
-## Scanning with a browser camera
+Changes to the wire format must update both specification languages, the
+machine-readable constants, and the conformance vectors in the same pull
+request. Details are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```ts
-import { RectaMatrixCameraScanner } from "@rectamatrix/browser";
+## Project policy
 
-const video = document.querySelector("video");
-if (!(video instanceof HTMLVideoElement)) throw new Error("Missing video");
+- [Roadmap](docs/ROADMAP.md)
+- [Governance](GOVERNANCE.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Changelog](CHANGELOG.md)
 
-const scanner = new RectaMatrixCameraScanner(video, {
-  onDecode(result) {
-    if (result.ok) console.log(result.bytes);
-  },
-});
-
-await scanner.start();
-```
-
-The scanner requests the environment-facing camera by default, samples at a
-bounded interval, and stops its own media tracks after the first successful
-decode. Call `scanner.stop()` when leaving the page. Camera permission and the
-secure-context requirement are controlled by the host browser. See
-`examples/scan-camera.ts` for a minimal lifecycle example or
-`packages/browser-demo` for the interactive live-camera interface.
-
-## Rendering files in a browser
-
-```ts
-import { renderJpeg, renderPng } from "@rectamatrix/browser";
-import { encodeText, renderSvg } from "@rectamatrix/encoder";
-
-const symbol = encodeText("Hallo RectaMatrix!", { eccLevel: "medium" });
-const svg = renderSvg(symbol, { moduleSize: 8, quietZone: 4 });
-const png = await renderPng(symbol, { moduleSize: 8, quietZone: 4 });
-const jpeg = await renderJpeg(symbol, {
-  moduleSize: 8,
-  quietZone: 4,
-  quality: 0.94,
-});
-const zpl = renderZpl(symbol, { moduleSize: 8, quietZone: 4 });
-
-// Explicit compact output for controlled backgrounds:
-const compactSvg = renderSvg(symbol, {
-  moduleSize: 8,
-  quietZoneProfile: "compact",
-});
-```
-
-SVG is the preferred lossless print output. PNG is the preferred raster format
-for scanning tests; JPEG is provided for workflows that require photographic
-files. ZPL output uses an uncompressed ASCII-hexadecimal `^GFA` graphic inside
-a complete `^XA`/`^XZ` label format.
-
-The English specification under `rspec/` is normative. The German document is
-an informative translation. Implementation decisions and unresolved questions
-are tracked in `docs/SPEC-IMPLEMENTATION-NOTES.md`.
-
-Licensing metadata has not yet been supplied and must be settled before the
-reference implementation is published.
+Licensed under the [Apache License 2.0](LICENSE).

@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+*.pgm binary
+conformance/generated/** linguist-generated=true
+conformance/vectors/** linguist-generated=true

@@ -1,8 +1,18 @@
 {
-  "name": "rectamatrix-reference",
-  "version": "0.0.0",
+  "name": "rectamatrix",
+  "version": "0.1.0-preview.1",
+  "description": "Experimental rectangular 2D barcode specification and TypeScript reference implementation.",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RectaMatrix/rectamatrix.git"
+  },
+  "homepage": "https://github.com/RectaMatrix/rectamatrix#readme",
+  "bugs": {
+    "url": "https://github.com/RectaMatrix/rectamatrix/issues"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -19,7 +29,8 @@
     "generate:vectors": "pnpm build && tsx scripts/generate-vectors.ts",
     "verify:vectors": "pnpm build && tsx scripts/verify-vectors.ts",
     "verify:spec": "tsx scripts/verify-spec-constants.ts",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm verify:spec && pnpm verify:vectors"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm verify:spec && pnpm verify:vectors",
+    "release:check": "pnpm check && pnpm build"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

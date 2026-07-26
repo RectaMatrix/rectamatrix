@@ -1,0 +1,35 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please avoid public disclosure of security vulnerabilities; use the Security Advisory form instead.
+  - type: input
+    id: version
+    attributes:
+      label: RectaMatrix version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the smallest input, options, and commands that reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        [Encoder, Decoder, Detector, Browser, Conformance, Specification, Demo]
+    validations:
+      required: true

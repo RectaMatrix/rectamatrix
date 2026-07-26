@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (for example v0.1.0-preview.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify and publish source archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:check
+      - name: Build release archives
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          mkdir release
+          tar -czf "release/rectamatrix-${RELEASE_TAG}-spec-conformance.tar.gz" spec conformance/generated conformance/schemas conformance/vectors
+          tar -czf "release/rectamatrix-${RELEASE_TAG}-typescript-reference.tar.gz" packages apps examples scripts tooling package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json README.md LICENSE
+          cd release
+          sha256sum *.tar.gz > SHA256SUMS.txt
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          options=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then options+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" release/* --verify-tag --generate-notes --title "RectaMatrix $RELEASE_TAG" "${options[@]}"

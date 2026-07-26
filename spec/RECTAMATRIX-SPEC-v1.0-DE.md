@@ -2,7 +2,7 @@
 
 ## Version 1.0
 
-Status: Stabiler Kernstandard
+Status: Formatkandidat 1 (Vorschau)
 Bezeichnung: RectaMatrix
 Kurzbezeichnung: RMX
 Version: 1.0

@@ -41,14 +41,14 @@ importers:
         specifier: workspace:*
         version: link:../encoder
 
-  packages/browser-demo:
+  apps/demo:
     dependencies:
       "@rectamatrix/browser":
         specifier: workspace:*
-        version: link:../browser
+        version: link:../../packages/browser
       "@rectamatrix/encoder":
         specifier: workspace:*
-        version: link:../encoder
+        version: link:../../packages/encoder
     devDependencies:
       vite:
         specifier: ^7.3.6

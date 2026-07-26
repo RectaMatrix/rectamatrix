@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   {
-    ignores: ["**/dist/**", "**/coverage/**", "rspec/**"],
+    ignores: ["**/dist/**", "**/coverage/**", "spec/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

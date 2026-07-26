@@ -18,9 +18,10 @@
   "include": [
     "eslint.config.js",
     "vitest.config.ts",
-    "types/**/*.d.ts",
+    "tooling/types/**/*.d.ts",
     "scripts/**/*.ts",
     "examples/**/*.ts",
+    "apps/*/src/**/*.ts",
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts"
   ]

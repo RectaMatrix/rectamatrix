@@ -2,7 +2,7 @@
 
 ## Version 1.0
 
-Status: Stable Core Standard
+Status: Format Candidate 1 (Preview)
 Name: RectaMatrix
 Abbreviation: RMX
 Version: 1.0
