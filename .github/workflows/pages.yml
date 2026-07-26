@@ -43,6 +43,7 @@ jobs:
         run: pnpm --filter @rectamatrix/browser-demo build:pages
       - name: Add demo to Pages site
         run: |
+          sudo chown -R "$USER":"$USER" _site
           mkdir -p _site/apps/demo
           cp -R apps/demo/dist/. _site/apps/demo/
       - name: Upload Pages artifact
