@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "build:pages": "vite build --base=/rectamatrix/",
+    "build:pages": "vite build --base=/rectamatrix/apps/demo/",
     "dev": "vite",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"

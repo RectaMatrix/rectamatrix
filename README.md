@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/format-candidate%201-orange.svg)](spec/RECTAMATRIX-SPEC-v1.0-EN.md)
 
-**[Open the RectaMatrix live demo](https://rectamatrix.github.io/rectamatrix/)**
+**[Open the RectaMatrix live demo](https://rectamatrix.github.io/rectamatrix/apps/demo/)**
 
 RectaMatrix is an experimental rectangular binary 2D barcode with a fixed 3:2
 aspect ratio. This repository contains the format specification, the official
@@ -55,7 +55,7 @@ pnpm demo
 
 The local demo is then available at `http://127.0.0.1:5173/`. The latest
 `main` build is published as the
-[RectaMatrix live demo](https://rectamatrix.github.io/rectamatrix/).
+[RectaMatrix live demo](https://rectamatrix.github.io/rectamatrix/apps/demo/).
 
 ## Encode and export
 
