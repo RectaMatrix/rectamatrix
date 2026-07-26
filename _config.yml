@@ -1,0 +1,8 @@
+title: RectaMatrix
+description: Experimental rectangular 2D barcode specification and TypeScript reference implementation.
+theme: jekyll-theme-primer
+repository: RectaMatrix/rectamatrix
+show_downloads: false
+exclude:
+  - node_modules
+  - apps/demo/dist
