@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rectamatrix.dev/schemas/image-vector-suite-v1.json",
+  "title": "RectaMatrix Version 1 image conformance vector suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "vectorVersion", "coreVersion", "kind", "vectors"],
+  "properties": {
+    "format": { "const": "rectamatrix-conformance" },
+    "vectorVersion": { "const": 1 },
+    "coreVersion": { "const": 1 },
+    "kind": { "const": "image" },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vector" }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "width", "height", "crc32cHex"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.pgm$"
+        },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "crc32cHex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$"
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceQuadrilateral": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/point" }
+        },
+        "samplesPerModule": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 9
+        },
+        "tryInverted": { "type": "boolean" },
+        "minimumModulePixels": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16
+        },
+        "maximumCandidates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        }
+      }
+    },
+    "referenceModules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[01]+$"
+      }
+    },
+    "referenceConfidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "successCommon": {
+      "type": "object",
+      "required": [
+        "result",
+        "type",
+        "payloadHex",
+        "sizeId",
+        "orientationDegrees",
+        "minimumOverallConfidence",
+        "referenceModules",
+        "referenceConfidence"
+      ],
+      "properties": {
+        "result": { "const": "success" },
+        "type": { "enum": ["binary", "utf8"] },
+        "payloadHex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})*$"
+        },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "orientationDegrees": { "enum": [0, 90, 180, 270] },
+        "minimumOverallConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "referenceModules": { "$ref": "#/$defs/referenceModules" },
+        "referenceConfidence": { "$ref": "#/$defs/referenceConfidence" }
+      }
+    },
+    "expected": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/successCommon" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "result": {},
+                "type": { "const": "binary" },
+                "payloadHex": {},
+                "sizeId": {},
+                "orientationDegrees": {},
+                "minimumOverallConfidence": {},
+                "referenceModules": {},
+                "referenceConfidence": {}
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/successCommon" },
+            {
+              "additionalProperties": false,
+              "required": ["text"],
+              "properties": {
+                "result": {},
+                "type": { "const": "utf8" },
+                "payloadHex": {},
+                "text": { "type": "string" },
+                "sizeId": {},
+                "orientationDegrees": {},
+                "minimumOverallConfidence": {},
+                "referenceModules": {},
+                "referenceConfidence": {}
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["result", "allowedErrorCodes"],
+          "properties": {
+            "result": { "const": "failure" },
+            "allowedErrorCodes": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "categories", "image", "options", "expected"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        },
+        "image": { "$ref": "#/$defs/asset" },
+        "options": { "$ref": "#/$defs/options" },
+        "expected": { "$ref": "#/$defs/expected" }
+      }
+    }
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rectamatrix.dev/schemas/encoder-vector-suite-v1.json",
+  "title": "RectaMatrix Version 1 encoder conformance vector suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "vectorVersion", "coreVersion", "kind", "vectors"],
+  "properties": {
+    "format": { "const": "rectamatrix-conformance" },
+    "vectorVersion": { "const": 1 },
+    "coreVersion": { "const": 1 },
+    "kind": { "const": "encoder" },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vector" }
+    }
+  },
+  "$defs": {
+    "hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2})*$"
+    },
+    "bitString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[01]+$"
+    },
+    "input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "hex"],
+          "properties": {
+            "type": { "const": "binary" },
+            "hex": { "$ref": "#/$defs/hex" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "text"],
+          "properties": {
+            "type": { "const": "utf8" },
+            "text": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eccLevel", "compression"],
+      "properties": {
+        "eccLevel": { "enum": ["low", "medium", "high"] },
+        "compression": { "enum": ["none", "rm-lz1", "auto"] },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 }
+      }
+    },
+    "rsBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "dataLength",
+        "parityLength",
+        "dataHex",
+        "parityHex",
+        "codewordHex"
+      ],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "dataLength": { "type": "integer", "minimum": 1, "maximum": 255 },
+        "parityLength": { "type": "integer", "minimum": 1, "maximum": 254 },
+        "dataHex": { "$ref": "#/$defs/hex" },
+        "parityHex": { "$ref": "#/$defs/hex" },
+        "codewordHex": { "$ref": "#/$defs/hex" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sizeId",
+        "width",
+        "height",
+        "payloadType",
+        "compression",
+        "eccLevel",
+        "maskId",
+        "originalLength",
+        "encodedLength",
+        "originalPayloadHex",
+        "encodedPayloadHex",
+        "crc32cHex",
+        "frameHex",
+        "headerInformationHex",
+        "protectedHeaderHex",
+        "rsBlockCount",
+        "rsTotalDataBytes",
+        "rsTotalParityBytes",
+        "rsTotalCodewordBytes",
+        "rsBlocks",
+        "interleavedCodewordsHex",
+        "unmaskedBodyBits",
+        "maskScores",
+        "finalMatrix"
+      ],
+      "properties": {
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "width": { "enum": [24, 36, 48, 72, 96] },
+        "height": { "enum": [16, 24, 32, 48, 64] },
+        "payloadType": { "enum": ["binary", "utf8"] },
+        "compression": { "enum": ["none", "rm-lz1"] },
+        "eccLevel": { "enum": ["low", "medium", "high"] },
+        "maskId": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "originalLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "encodedLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "originalPayloadHex": { "$ref": "#/$defs/hex" },
+        "encodedPayloadHex": { "$ref": "#/$defs/hex" },
+        "crc32cHex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$"
+        },
+        "frameHex": { "$ref": "#/$defs/hex" },
+        "headerInformationHex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "protectedHeaderHex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{24}$"
+        },
+        "rsBlockCount": { "type": "integer", "minimum": 1 },
+        "rsTotalDataBytes": { "type": "integer", "minimum": 4 },
+        "rsTotalParityBytes": { "type": "integer", "minimum": 4 },
+        "rsTotalCodewordBytes": { "type": "integer", "minimum": 8 },
+        "rsBlocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rsBlock" }
+        },
+        "interleavedCodewordsHex": { "$ref": "#/$defs/hex" },
+        "unmaskedBodyBits": { "$ref": "#/$defs/bitString" },
+        "maskScores": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "finalMatrix": {
+          "type": "array",
+          "minItems": 16,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/bitString" }
+        }
+      }
+    },
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "input", "options", "expected"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "input": { "$ref": "#/$defs/input" },
+        "options": { "$ref": "#/$defs/options" },
+        "expected": { "$ref": "#/$defs/expected" }
+      }
+    }
+  }
+}

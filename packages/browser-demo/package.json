@@ -1,0 +1,19 @@
+{
+  "name": "@rectamatrix/browser-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@rectamatrix/browser": "workspace:*",
+    "@rectamatrix/encoder": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.3.6"
+  }
+}

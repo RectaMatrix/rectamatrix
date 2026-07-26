@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "baseUrl": ".",
+    "checkJs": false,
+    "noEmit": true,
+    "paths": {
+      "@rectamatrix/core": ["packages/core/src/index.ts"],
+      "@rectamatrix/conformance": ["packages/conformance/src/index.ts"],
+      "@rectamatrix/browser": ["packages/browser/src/index.ts"],
+      "@rectamatrix/decoder": ["packages/decoder/src/index.ts"],
+      "@rectamatrix/detector": ["packages/detector/src/index.ts"],
+      "@rectamatrix/encoder": ["packages/encoder/src/index.ts"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": [
+    "eslint.config.js",
+    "vitest.config.ts",
+    "types/**/*.d.ts",
+    "scripts/**/*.ts",
+    "examples/**/*.ts",
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts"
+  ]
+}

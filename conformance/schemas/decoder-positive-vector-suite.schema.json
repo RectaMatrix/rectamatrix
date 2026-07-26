@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rectamatrix.dev/schemas/decoder-positive-vector-suite-v1.json",
+  "title": "RectaMatrix Version 1 positive decoder conformance vector suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "vectorVersion", "coreVersion", "kind", "vectors"],
+  "properties": {
+    "format": { "const": "rectamatrix-conformance" },
+    "vectorVersion": { "const": 1 },
+    "coreVersion": { "const": 1 },
+    "kind": { "const": "decoder-positive" },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vector" }
+    }
+  },
+  "$defs": {
+    "hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2})*$"
+    },
+    "detectorMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "imageQuality": { "type": "number" },
+        "blurEstimate": { "type": "number" },
+        "perspectiveEstimateDegrees": { "type": "number" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules"],
+      "properties": {
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[01]+$"
+          }
+        },
+        "confidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "detectorMetadata": { "$ref": "#/$defs/detectorMetadata" }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "overallConfidence",
+        "averageModuleConfidence",
+        "minimumModuleConfidence",
+        "anchorScore",
+        "topClockScore",
+        "leftClockScore",
+        "correctedCodewords",
+        "erasuresUsed",
+        "headerCorrectedCodewords",
+        "headerErasuresUsed",
+        "decodeAttempts",
+        "headerErasureProfile",
+        "bodyErasureProfile",
+        "crcValid"
+      ],
+      "properties": {
+        "profile": { "const": "rmx-cv-1" },
+        "overallConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "averageModuleConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimumModuleConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "anchorScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "topClockScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "leftClockScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "correctedCodewords": { "type": "integer", "minimum": 0 },
+        "erasuresUsed": { "type": "integer", "minimum": 0 },
+        "headerCorrectedCodewords": { "type": "integer", "minimum": 0 },
+        "headerErasuresUsed": { "type": "integer", "minimum": 0 },
+        "decodeAttempts": { "type": "integer", "minimum": 1 },
+        "headerErasureProfile": {
+          "enum": ["reference", "strict", "permissive", "none"]
+        },
+        "bodyErasureProfile": {
+          "enum": ["reference", "strict", "permissive", "none"]
+        },
+        "crcValid": { "const": true },
+        "imageQuality": { "type": "number", "minimum": 0, "maximum": 1 },
+        "blurEstimate": { "type": "number" },
+        "perspectiveEstimateDegrees": { "type": "number" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sizeId",
+        "width",
+        "height",
+        "eccLevel",
+        "compression",
+        "maskId",
+        "quality"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "width": { "enum": [24, 36, 48, 72, 96] },
+        "height": { "enum": [16, 24, 32, 48, 64] },
+        "eccLevel": { "enum": ["low", "medium", "high"] },
+        "compression": { "enum": ["none", "rm-lz1"] },
+        "maskId": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "quality": { "$ref": "#/$defs/quality" }
+      }
+    },
+    "expected": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "payloadHex", "metadata"],
+          "properties": {
+            "type": { "const": "binary" },
+            "payloadHex": { "$ref": "#/$defs/hex" },
+            "metadata": { "$ref": "#/$defs/metadata" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "payloadHex", "text", "metadata"],
+          "properties": {
+            "type": { "const": "utf8" },
+            "payloadHex": { "$ref": "#/$defs/hex" },
+            "text": { "type": "string" },
+            "metadata": { "$ref": "#/$defs/metadata" }
+          }
+        }
+      ]
+    },
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "input", "expected"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "input": { "$ref": "#/$defs/input" },
+        "expected": { "$ref": "#/$defs/expected" }
+      }
+    }
+  }
+}

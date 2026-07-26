@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rectamatrix.dev/schemas/decoder-negative-vector-suite-v1.json",
+  "title": "RectaMatrix Version 1 negative decoder conformance vector suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "vectorVersion", "coreVersion", "kind", "vectors"],
+  "properties": {
+    "format": { "const": "rectamatrix-conformance" },
+    "vectorVersion": { "const": 1 },
+    "coreVersion": { "const": 1 },
+    "kind": { "const": "decoder-negative" },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vector" }
+    }
+  },
+  "$defs": {
+    "detectorMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "imageQuality": { "type": "number" },
+        "blurEstimate": { "type": "number" },
+        "perspectiveEstimateDegrees": { "type": "number" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules"],
+      "properties": {
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[01]*$"
+          }
+        },
+        "confidence": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "number" }
+          }
+        },
+        "detectorMetadata": { "$ref": "#/$defs/detectorMetadata" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errorCodes"],
+      "properties": {
+        "errorCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+          }
+        }
+      }
+    },
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "input", "expected"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "input": { "$ref": "#/$defs/input" },
+        "expected": { "$ref": "#/$defs/expected" }
+      }
+    }
+  }
+}

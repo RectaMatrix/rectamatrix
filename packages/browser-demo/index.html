@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Lokale Live-Kamera-Demo für den RectaMatrix TypeScript-Decoder."
+    />
+    <meta name="theme-color" content="#151817" />
+    <title>RectaMatrix · Live Scanner</title>
+  </head>
+  <body data-scanner="idle">
+    <div class="page">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="RectaMatrix Startseite">
+          <span class="brand-mark" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </span>
+          <span>RectaMatrix</span>
+        </a>
+        <div class="build-label">
+          <span class="build-dot" aria-hidden="true"></span>
+          TypeScript Reference · V1
+        </div>
+      </header>
+
+      <main>
+        <section class="intro" aria-labelledby="page-title">
+          <div>
+            <p class="eyebrow">Browser Camera Lab</p>
+            <h1 id="page-title">RectaMatrix<br />live lesen.</h1>
+          </div>
+          <div class="intro-copy">
+            <p>
+              Halte einen Code ruhig und vollständig in den Rahmen. Die
+              Auswertung läuft ausschließlich auf diesem Gerät.
+            </p>
+            <div class="status-line" aria-live="polite">
+              <span class="status-indicator" aria-hidden="true"></span>
+              <span id="scanner-status">Bereit für den Kamerastart</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace" aria-label="RectaMatrix Kamera-Scanner">
+          <div class="camera-card">
+            <div class="camera-stage">
+              <video
+                id="camera"
+                autoplay
+                muted
+                playsinline
+                aria-label="Live-Kamerabild"
+              ></video>
+
+              <div class="camera-placeholder" aria-hidden="true">
+                <div class="placeholder-symbol">
+                  <span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span>
+                </div>
+                <p>Kamera ist noch aus</p>
+              </div>
+
+              <div class="scan-frame" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+                <div class="scan-line"></div>
+              </div>
+
+              <div class="camera-badge">
+                <span></span>
+                <span id="camera-badge-text">Offline</span>
+              </div>
+            </div>
+
+            <div class="camera-controls">
+              <div>
+                <p class="control-title">Live-Erkennung</p>
+                <p class="control-note">Rückkamera · Verarbeitung im Browser</p>
+              </div>
+              <div class="button-row">
+                <button
+                  class="button button-secondary"
+                  id="stop-button"
+                  disabled
+                >
+                  Stoppen
+                </button>
+                <button class="button button-primary" id="start-button">
+                  <span>Kamera starten</span>
+                  <span aria-hidden="true">↗</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="result-card" aria-labelledby="result-title">
+            <div class="result-header">
+              <div>
+                <p class="eyebrow">Letzter Fund</p>
+                <h2 id="result-title">Noch kein Code</h2>
+              </div>
+              <span class="result-count" id="result-count">00</span>
+            </div>
+
+            <div class="result-output" id="result-output">
+              <span class="output-empty">—</span>
+              <p>Ein erfolgreicher Scan erscheint hier.</p>
+            </div>
+
+            <dl class="metrics">
+              <div>
+                <dt>Sicherheit</dt>
+                <dd id="confidence-value">—</dd>
+              </div>
+              <div>
+                <dt>Ausrichtung</dt>
+                <dd id="orientation-value">—</dd>
+              </div>
+              <div>
+                <dt>Fehlerkorrektur</dt>
+                <dd id="correction-value">—</dd>
+              </div>
+              <div>
+                <dt>ECC-Level</dt>
+                <dd id="ecc-value">—</dd>
+              </div>
+            </dl>
+
+            <div class="result-footer">
+              <span id="last-scan-time">Wartet auf Kameradaten</span>
+              <button class="copy-button" id="copy-button" disabled>
+                Kopieren
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <section class="generator" aria-labelledby="generator-title">
+          <div class="generator-heading">
+            <div>
+              <p class="eyebrow">Code Generator</p>
+              <h2 id="generator-title">Erzeugen. Laden. Scannen.</h2>
+            </div>
+            <p>
+              Erstelle einen normgerechten Testcode direkt im Browser. SVG ist
+              ideal für Druck, PNG und JPEG für schnelle Tests.
+            </p>
+          </div>
+
+          <div class="generator-grid">
+            <form class="generator-form" id="generator-form">
+              <label for="generator-input">Inhalt</label>
+              <textarea
+                id="generator-input"
+                rows="5"
+                maxlength="2000"
+                spellcheck="false"
+              >
+Hallo RectaMatrix!</textarea>
+
+              <div class="generator-options">
+                <label>
+                  <span>Fehlerkorrektur</span>
+                  <select id="generator-ecc">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Modulgröße</span>
+                  <select id="generator-module-size">
+                    <option value="4">4 px</option>
+                    <option value="8" selected>8 px</option>
+                    <option value="12">12 px</option>
+                    <option value="16">16 px</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Ruhezone</span>
+                  <select id="generator-quiet-zone">
+                    <option value="standard" selected>
+                      Standard · 4 Module
+                    </option>
+                    <option value="compact">Compact · 2 Module</option>
+                  </select>
+                </label>
+              </div>
+
+              <button
+                class="button button-primary generator-submit"
+                type="submit"
+              >
+                <span>Code erzeugen</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <p
+                class="generator-status"
+                id="generator-status"
+                aria-live="polite"
+              >
+                Bereit
+              </p>
+            </form>
+
+            <div class="generator-preview">
+              <div class="preview-toolbar">
+                <span>Vorschau</span>
+                <span id="generator-geometry">—</span>
+              </div>
+              <div class="symbol-stage">
+                <img
+                  id="generator-image"
+                  alt="Vorschau des erzeugten RectaMatrix-Codes"
+                />
+              </div>
+              <dl class="generator-metadata">
+                <div>
+                  <dt>Nutzdaten</dt>
+                  <dd id="generator-bytes">—</dd>
+                </div>
+                <div>
+                  <dt>Maske</dt>
+                  <dd id="generator-mask">—</dd>
+                </div>
+                <div>
+                  <dt>Kompression</dt>
+                  <dd id="generator-compression">—</dd>
+                </div>
+              </dl>
+              <div class="download-row">
+                <button id="download-svg" class="download-button" type="button">
+                  <span>SVG</span><small>Vektor</small>
+                </button>
+                <button id="download-png" class="download-button" type="button">
+                  <span>PNG</span><small>Verlustfrei</small>
+                </button>
+                <button
+                  id="download-jpeg"
+                  class="download-button"
+                  type="button"
+                >
+                  <span>JPEG</span><small>Fotoformat</small>
+                </button>
+                <button id="copy-zpl" class="download-button" type="button">
+                  <span>ZPL</span><small>Code kopieren</small>
+                </button>
+              </div>
+              <div class="zpl-panel">
+                <div class="zpl-heading">
+                  <span>Zebra Programming Language</span>
+                  <span>^GFA · ASCII Hex</span>
+                </div>
+                <textarea
+                  id="zpl-output"
+                  rows="7"
+                  readonly
+                  spellcheck="false"
+                  aria-label="Erzeugter ZPL-Code"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="guidance" aria-label="Hinweise zur Erkennung">
+          <article>
+            <span class="guidance-number">01</span>
+            <div>
+              <h2>Ganz im Bild</h2>
+              <p>
+                Der helle Ruhebereich rund um den Code muss sichtbar bleiben.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span class="guidance-number">02</span>
+            <div>
+              <h2>Ruhig halten</h2>
+              <p>
+                Kurze Bewegungsruhe verbessert Kontrast und Fehlerkorrektur.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span class="guidance-number">03</span>
+            <div>
+              <h2>Privat by design</h2>
+              <p>
+                Frames verlassen das Gerät nicht und werden nicht gespeichert.
+              </p>
+            </div>
+          </article>
+        </section>
+      </main>
+
+      <footer>
+        <span>RectaMatrix Reference Implementation</span>
+        <span>Kamerazugriff benötigt HTTPS oder localhost.</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
