@@ -102,6 +102,21 @@ describe("complete RectaMatrix encoding", () => {
     ).toThrow(/shorter/i);
   });
 
+  it("selects RM-HLE1 for compact structured text", () => {
+    const text = "https://www.example.com/items/123456789";
+    const encoded = encodeText(text, { compression: "auto" });
+    expect(encoded.compression).toBe("rm-hle1");
+    expect(encoded.encodedLength).toBeLessThan(
+      new TextEncoder().encode(text).length,
+    );
+  });
+
+  it("rejects RM-HLE1 for binary Payloads", () => {
+    expect(() =>
+      encodeBytes(Uint8Array.of(1, 2, 3), { compression: "rm-hle1" }),
+    ).toThrow(/text Payload/i);
+  });
+
   it("honors exact uncompressed capacity boundaries", () => {
     expect(
       encodeBytes(new Uint8Array(25), {

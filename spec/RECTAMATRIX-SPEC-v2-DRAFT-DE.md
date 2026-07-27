@@ -201,8 +201,59 @@ mindestens:
 * UTF-8 Fallback: vollständiges Unicode ohne Verlust,
 * End of Data.
 
-Der normative Tabelleninhalt und die exakten Latch-, Shift-, Längen- und
-Terminierungscodes werden in einem eigenen RM-HLE1-Kapitel festgelegt.
+### 10.1 Segmentaufbau
+
+Bits werden mit dem höchstwertigen Bit zuerst geschrieben. Jedes Segment
+beginnt mit einem Drei-Bit-Opcode:
+
+| Opcode | Segment | Nachfolgende Felder |
+| --- | --- | --- |
+| `000` | Datenende | keine Felder |
+| `001` | Numerisch | 8 Bit `Zeichenanzahl - 1`, danach gepackte Ziffern |
+| `010` | Alphanumerisch | 8 Bit `Zeichenanzahl - 1`, danach Tabellenwerte |
+| `011` | Lower | 8 Bit `Zeichenanzahl - 1`, danach 5-Bit-Tabellenwerte |
+| `100` | Upper | 8 Bit `Zeichenanzahl - 1`, danach 5-Bit-Tabellenwerte |
+| `101` | URL-Token | ein 4-Bit-Tokenindex |
+| `110` | Byte | 8 Bit `Byteanzahl - 1`, danach unveränderte Bytes |
+| `111` | reserviert | in v2 Core ungültig |
+
+Segmente mit Längenfeld enthalten 1 bis 256 Zeichen beziehungsweise Bytes.
+Das Datenende ist verpflichtend. Verbleibende Bits bis zur nächsten
+Bytegrenze MÜSSEN null sein.
+
+Numerisch speichert jede vollständige Dreiergruppe als Zahlenwert in zehn Bit.
+Ein abschließendes Paar verwendet sieben Bit, eine einzelne Ziffer vier Bit.
+Werte außerhalb `0..999`, `0..99` beziehungsweise `0..9` sind ungültig.
+
+Alphanumerisch verwendet diese Tabelle mit 45 Zeichen:
+
+```text
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:
+```
+
+Ein Paar wird als `45 × erstes + zweites` in elf Bit gespeichert. Ein einzelnes
+Restzeichen wird als Tabellenindex in sechs Bit gespeichert.
+
+Lower und Upper verwenden folgende Tabellen mit jeweils 32 Zeichen und
+speichern jeden Index in fünf Bit:
+
+```text
+Lower:  abcdefghijklmnopqrstuvwxyz.,-_/
+Upper:  ABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_/
+```
+
+Das führende Leerzeichen besitzt den Tabellenindex null. Die 16 URL-Tokens
+lauten:
+
+```text
+https://  http://  www.  .com  .org  .net  .de  /
+?         &        =     #     :     .     -    _
+```
+
+Byte-Segmente enthalten beliebige Bytes. Für Unicode außerhalb der übrigen
+Modi schreibt der Encoder striktes UTF-8 in Byte-Segmente. Der vollständig
+decodierte Strom MUSS bei Unicode-Textsemantik die strikte UTF-8-Prüfung
+bestehen. RM-HLE1 ist mit binärer Payload-Semantik ungültig.
 
 Der Referenzencoder MUSS dynamische Programmierung oder ein äquivalentes
 Verfahren verwenden. Er darf keinen Moduswechsel wählen, der den vollständigen
@@ -276,7 +327,7 @@ Vor einer Implementierung als stabile v2 müssen festgelegt werden:
 
 1. exakte Locator- und Ausrichtungszellen,
 2. räumliche Headerpermutation und 64-Bit-Whitening-Folge,
-3. RM-HLE1-Tabellen und präfixfreie Steuercodes,
+3. weitere RM-HLE1-Tabellenoptimierung anhand repräsentativer Datensätze,
 4. genaue ECC-Quoten und Mindestparitäten,
 5. acht Maskenfunktionen und Strafbewertung,
 6. CRC-24-Polynom und alle Prüfsummen-Testvektoren,

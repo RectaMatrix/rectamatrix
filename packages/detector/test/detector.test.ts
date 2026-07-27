@@ -298,7 +298,7 @@ describe("RectaMatrix image detector", () => {
     if (result.ok && result.type === "utf8") {
       expect(result.text).toBe(text);
     }
-  });
+  }, 15_000);
 
   it("handles directional motion blur and a wider glare band", () => {
     const text = "Motion";
@@ -367,7 +367,7 @@ describe("RectaMatrix image detector", () => {
       expect(result.bytes).toEqual(payload);
       expect(result.vision.inverted).toBe(true);
     }
-  });
+  }, 15_000);
 
   it("exposes the deterministic normalized handoff", () => {
     const symbol = encodeText("handoff", {

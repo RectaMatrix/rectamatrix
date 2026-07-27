@@ -194,8 +194,57 @@ RM-HLE1 is a bit-packed, lossless high-level stream. It supports at least:
 * UTF-8 Fallback: complete Unicode without loss,
 * End of Data.
 
-Normative table contents and exact prefix-free Latch, Shift, length, and
-termination codes are defined in a dedicated RM-HLE1 chapter.
+### 10.1 Segment framing
+
+Bits are written most-significant bit first. Each segment begins with a
+three-bit opcode:
+
+| Opcode | Segment | Following fields |
+| --- | --- | --- |
+| `000` | End of Data | no fields |
+| `001` | Numeric | 8-bit `characterCount - 1`, then packed digits |
+| `010` | Alphanumeric | 8-bit `characterCount - 1`, then table values |
+| `011` | Lower | 8-bit `characterCount - 1`, then 5-bit table values |
+| `100` | Upper | 8-bit `characterCount - 1`, then 5-bit table values |
+| `101` | URL Token | one 4-bit token index |
+| `110` | Byte | 8-bit `byteCount - 1`, then literal bytes |
+| `111` | reserved | invalid in v2 Core |
+
+Counted segments contain 1 through 256 characters or bytes. End of Data is
+mandatory. Remaining bits through the final byte boundary MUST be zero.
+
+Numeric stores each complete group of three digits as its integer value in ten
+bits. A final pair uses seven bits and a final single digit uses four bits.
+Values outside `0..999`, `0..99`, or `0..9` respectively are invalid.
+
+Alphanumeric uses this 45-character table:
+
+```text
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:
+```
+
+Each pair is `45 × first + second` in eleven bits. A final single character is
+its table index in six bits.
+
+Lower and Upper use the following 32-character tables and encode every index
+in five bits:
+
+```text
+Lower:  abcdefghijklmnopqrstuvwxyz.,-_/
+Upper:  ABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_/
+```
+
+The leading space is table index zero. The 16 URL tokens are:
+
+```text
+https://  http://  www.  .com  .org  .net  .de  /
+?         &        =     #     :     .     -    _
+```
+
+Byte segments contain arbitrary bytes. For Unicode not covered by another
+mode, the encoder places strict UTF-8 bytes in Byte segments. The complete
+decoded stream MUST pass strict UTF-8 validation when Payload Semantics is
+Unicode text. RM-HLE1 is invalid with binary Payload Semantics.
 
 The reference encoder MUST use dynamic programming or an equivalent method. It
 MUST NOT choose mode changes that enlarge the complete stream. Raw Byte Stream
@@ -268,7 +317,7 @@ Before v2 can become stable, the following must be fixed:
 
 1. exact locator and alignment cells,
 2. spatial Header permutation and 64-bit whitening sequence,
-3. RM-HLE1 tables and prefix-free control codes,
+3. additional RM-HLE1 table tuning based on representative datasets,
 4. exact ECC ratios and minimum parity,
 5. eight mask functions and penalty score,
 6. CRC-24 polynomial and all checksum vectors,

@@ -24,7 +24,7 @@ interactive browser demo.
 | Symbol sizes     | 30 geometries from 24×16 through 288×96 modules          |
 | Payloads         | Binary and strict UTF-8 text                             |
 | Error correction | Reed–Solomon over GF(256), four ECC levels               |
-| Compression      | Deterministic RM-LZ1                                     |
+| Encoding         | Raw bytes, RM-HLE1 high-level encoding, and RM-LZ1       |
 | Quiet Zone       | Standard 4 modules; Compact 2 modules for controlled use |
 | Output           | SVG, PNG, JPEG, and ZPL                                  |
 | Input            | Sampled matrices, image data, and browser camera frames  |
@@ -115,8 +115,8 @@ redesign. The
 geometry families. These drafts remain non-normative while RM-HLE1 and the new
 locator are completed and tested.
 
-The current suite contains 164 canonical artifacts: 107 encoder vectors, 15
-positive decoder vectors, 19 negative decoder vectors, and 23 portable image
+The current suite contains 169 canonical artifacts: 110 encoder vectors, 16
+positive decoder vectors, 20 negative decoder vectors, and 23 portable image
 vectors. `pnpm verify:vectors` performs byte-, bit-, and matrix-exact
 verification.
 

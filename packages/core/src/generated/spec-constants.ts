@@ -71,7 +71,8 @@ export const PAYLOAD_TYPE_VALUES = {
 
 export const COMPRESSION_MODE_VALUES = {
   none: 0b00,
-  "rm-lz1": 0b01,
+  "rm-hle1": 0b01,
+  "rm-lz1": 0b10,
 } as const;
 
 export const INTEGRITY_PROFILE_VALUES = {

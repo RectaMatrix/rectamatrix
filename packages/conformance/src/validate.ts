@@ -92,7 +92,7 @@ function validateOptions(
   );
   enumeration(
     options.compression,
-    ["none", "rm-lz1", "auto"],
+    ["none", "rm-hle1", "rm-lz1", "auto"],
     `${path}.compression`,
   );
   if (options.sizeId !== undefined) sizeId(options.sizeId, `${path}.sizeId`);
@@ -142,7 +142,11 @@ function validateExpected(
     ["binary", "utf8"] satisfies readonly PayloadType[],
     `${path}.payloadType`,
   );
-  enumeration(expected.compression, ["none", "rm-lz1"], `${path}.compression`);
+  enumeration(
+    expected.compression,
+    ["none", "rm-hle1", "rm-lz1"],
+    `${path}.compression`,
+  );
   enumeration(
     expected.eccLevel,
     ["low", "medium", "high"] satisfies readonly EccLevel[],

@@ -79,6 +79,17 @@ describe("sampled RectaMatrix decoding", () => {
     }
   });
 
+  it("decodes RM-HLE1 structured text", () => {
+    const text = "https://rectamatrix.dev/items/123456789";
+    const encoded = encodeText(text, { compression: "rm-hle1" });
+    const decoded = decodeSampledSymbol({ modules: encoded.matrix });
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok && decoded.type === "utf8") {
+      expect(decoded.text).toBe(text);
+      expect(decoded.metadata.compression).toBe("rm-hle1");
+    }
+  });
+
   it("corrects the maximum four unknown Body errors for medium ECC", () => {
     const input = Uint8Array.from(
       { length: 30 },
@@ -294,7 +305,7 @@ function rewriteHeader(
   symbol: ReturnType<typeof encodeBytes>,
   fields: {
     readonly payloadType: "binary" | "utf8";
-    readonly compression: "none" | "rm-lz1";
+    readonly compression: "none" | "rm-hle1" | "rm-lz1";
     readonly encodedLength: number;
   },
 ): void {

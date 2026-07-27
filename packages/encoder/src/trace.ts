@@ -16,6 +16,7 @@ import {
   encodeUtf8Strict,
   getSymbolSize,
   interleaveCodewords,
+  rmhle1Encode,
   rmlz1Encode,
   selectBestMask,
   uint32ToBytesBE,
@@ -55,7 +56,7 @@ export function encodeTextWithTrace(
   options?: EncodeOptions,
 ): EncoderTrace {
   const symbol = encodeText(text, options);
-  return traceEncodedSymbol(encodeUtf8Strict(text), symbol);
+  return traceEncodedSymbol(encodeUtf8Strict(text), symbol, text);
 }
 
 export function encodeBytesWithTrace(
@@ -69,6 +70,7 @@ export function encodeBytesWithTrace(
 function traceEncodedSymbol(
   originalPayload: Uint8Array,
   symbol: EncodedSymbol,
+  originalText?: string,
 ): EncoderTrace {
   const encodedPayload =
     symbol.compression === "rm-lz1"
@@ -76,7 +78,9 @@ function traceEncodedSymbol(
           originalPayload.length,
           rmlz1Encode(originalPayload),
         )
-      : originalPayload.slice();
+      : symbol.compression === "rm-hle1"
+        ? rmhle1Encode(originalText!)
+        : originalPayload.slice();
   const checksum = crc32c(originalPayload);
   const frame = new Uint8Array(encodedPayload.length + 4);
   frame.set(encodedPayload);

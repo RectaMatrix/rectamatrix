@@ -54,6 +54,21 @@ add(
   text("A".repeat(128)),
   Object.freeze({ eccLevel: "high", compression: "rm-lz1" }),
 );
+add(
+  "explicit-rm-hle1-numeric",
+  text("001234567890123456789"),
+  Object.freeze({ eccLevel: "medium", compression: "rm-hle1" }),
+);
+add(
+  "explicit-rm-hle1-url",
+  text("https://www.example.com/items/123456789"),
+  Object.freeze({ eccLevel: "medium", compression: "rm-hle1" }),
+);
+add(
+  "explicit-rm-hle1-byte-fallback",
+  text("Grüße 🧭 12345"),
+  Object.freeze({ eccLevel: "high", compression: "rm-hle1" }),
+);
 
 for (const capacity of CALCULATED_CAPACITIES) {
   for (const eccLevel of ["low", "medium", "high"] as const) {

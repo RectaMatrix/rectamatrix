@@ -19,6 +19,7 @@
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "pnpm -r build",
+    "compare:rm-hle1": "tsx scripts/compare-rmhle1.ts",
     "demo": "pnpm --filter @rectamatrix/browser-demo dev --host 127.0.0.1",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

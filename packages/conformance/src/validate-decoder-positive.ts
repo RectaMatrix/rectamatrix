@@ -79,7 +79,11 @@ function validateMetadata(value: unknown, path: string): void {
   integer(metadata.width, size.width, size.width, `${path}.width`);
   integer(metadata.height, size.height, size.height, `${path}.height`);
   enumeration(metadata.eccLevel, ["low", "medium", "high"], `${path}.eccLevel`);
-  enumeration(metadata.compression, ["none", "rm-lz1"], `${path}.compression`);
+  enumeration(
+    metadata.compression,
+    ["none", "rm-hle1", "rm-lz1"],
+    `${path}.compression`,
+  );
   integer(metadata.maskId, 0, 3, `${path}.maskId`);
   validateQuality(metadata.quality, `${path}.quality`);
 }

@@ -17,6 +17,7 @@ import {
   encodeUtf8Strict,
   getSymbolSize,
   interleaveCodewords,
+  rmhle1Encode,
   rmlz1Encode,
   selectBestMask,
   uint32ToBytesBE,
@@ -51,7 +52,7 @@ export function encodeText(
   if (typeof text !== "string") {
     throw new TypeError("RectaMatrix text input must be a string.");
   }
-  return encodePayload(encodeUtf8Strict(text), "utf8", options);
+  return encodePayload(encodeUtf8Strict(text), "utf8", options, text);
 }
 
 export function encodeBytes(
@@ -68,12 +69,18 @@ function encodePayload(
   original: Uint8Array,
   payloadType: PayloadType,
   options?: EncodeOptions,
+  originalText?: string,
 ): EncodedSymbol {
   const configuration = validateOptions(options);
   if (original.length > 0xffff) {
     throw new RangeError("RectaMatrix Payload cannot exceed 65535 bytes.");
   }
-  const prepared = preparePayload(original, configuration.compression);
+  const prepared = preparePayload(
+    original,
+    payloadType,
+    configuration.compression,
+    originalText,
+  );
   const { size, layout } = selectSize(
     prepared.frame.length,
     configuration.eccLevel,
@@ -133,12 +140,32 @@ function encodePayload(
 
 function preparePayload(
   original: Uint8Array,
+  payloadType: PayloadType,
   mode: CompressionMode,
+  originalText?: string,
 ): PreparedPayload {
-  let encoded: Uint8Array = original.slice();
-  let compression: WireCompressionMode = "none";
+  const candidates: Array<{
+    readonly encoded: Uint8Array;
+    readonly compression: WireCompressionMode;
+  }> = [{ encoded: original.slice(), compression: "none" }];
 
-  if (mode !== "none") {
+  if (mode === "rm-hle1" || mode === "auto") {
+    if (payloadType !== "utf8" || originalText === undefined) {
+      if (mode === "rm-hle1") {
+        throw new RectaMatrixError(
+          "UNSUPPORTED_COMPRESSION",
+          "RM-HLE1 is available only for Unicode text Payloads.",
+        );
+      }
+    } else {
+      candidates.push({
+        encoded: rmhle1Encode(originalText),
+        compression: "rm-hle1",
+      });
+    }
+  }
+
+  if (mode === "rm-lz1" || mode === "auto") {
     const compressed = rmlz1Encode(original);
     const originalLengthPrefix = encodeOriginalLengthPrefix(original.length);
     const compressedStream = new Uint8Array(
@@ -146,21 +173,28 @@ function preparePayload(
     );
     compressedStream.set(originalLengthPrefix);
     compressedStream.set(compressed, originalLengthPrefix.length);
-    const useCompressed =
-      mode === "rm-lz1"
-        ? compressedStream.length < original.length
-        : compressedStream.length + 2 <= original.length;
-    if (mode === "rm-lz1" && !useCompressed) {
+    if (mode === "rm-lz1" && compressedStream.length >= original.length) {
       throw new RectaMatrixError(
         "COMPRESSION_NOT_BENEFICIAL",
         "RM-LZ1 must make the Encoded Payload shorter.",
       );
     }
-    if (useCompressed) {
-      encoded = compressedStream;
-      compression = "rm-lz1";
-    }
+    candidates.push({ encoded: compressedStream, compression: "rm-lz1" });
   }
+
+  const eligible =
+    mode === "none"
+      ? candidates.filter(({ compression }) => compression === "none")
+      : mode === "rm-hle1"
+        ? candidates.filter(({ compression }) => compression === "rm-hle1")
+        : mode === "rm-lz1"
+          ? candidates.filter(({ compression }) => compression === "rm-lz1")
+          : candidates;
+  const selected = eligible.reduce((best, candidate) =>
+    candidate.encoded.length < best.encoded.length ? candidate : best,
+  );
+  const encoded = selected.encoded;
+  const compression = selected.compression;
 
   const frame = new Uint8Array(encoded.length + 4);
   frame.set(encoded);
@@ -213,7 +247,7 @@ function validateOptions(options?: EncodeOptions): EncodingConfiguration {
     throw new RangeError("Unsupported RectaMatrix ECC Level.");
   }
   const compression = options?.compression ?? "auto";
-  if (!["none", "rm-lz1", "auto"].includes(compression)) {
+  if (!["none", "rm-hle1", "rm-lz1", "auto"].includes(compression)) {
     throw new RangeError("Unsupported RectaMatrix compression option.");
   }
   const sizeId = options?.sizeId;

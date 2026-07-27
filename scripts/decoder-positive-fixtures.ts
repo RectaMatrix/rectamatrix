@@ -72,6 +72,18 @@ add(
   cleanQuality(),
 );
 
+const hleTextValue = "https://rectamatrix.dev/items/123456789";
+const hleText = encodeTextWithTrace(hleTextValue, {
+  eccLevel: "medium",
+  compression: "rm-hle1",
+});
+add(
+  "clean-rm-hle1-utf8",
+  inputFromFixture(fixture(hleText), false),
+  { type: "utf8", text: hleTextValue },
+  cleanQuality(),
+);
+
 const headerUnknown = fixture(cleanBinary);
 damageBytes(headerUnknown, "header", [0, 1], undefined);
 add(

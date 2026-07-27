@@ -32,7 +32,7 @@ export type SizeId =
   | 28
   | 29;
 export type EccLevel = "low" | "medium" | "high";
-export type CompressionMode = "none" | "rm-lz1";
+export type CompressionMode = "none" | "rm-hle1" | "rm-lz1";
 export type PayloadType = "binary" | "utf8";
 export type MaskId = 0 | 1 | 2 | 3;
 export type IntegrityProfile = "crc32c";

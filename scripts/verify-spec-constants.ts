@@ -6,6 +6,11 @@ import {
   RECTAMATRIX_SIZES,
 } from "../packages/core/src/generated/spec-constants.js";
 import {
+  RM_HLE1_ALPHANUMERIC_TABLE,
+  RM_HLE1_LOWER_TABLE,
+  RM_HLE1_UPPER_TABLE,
+} from "../packages/core/src/rmhle1.js";
+import {
   calculateAccessibleModules,
   calculateBodyBits,
   maximumCodewordBytes,
@@ -15,6 +20,14 @@ import type { EccLevel } from "../packages/core/src/types.js";
 
 const ECC_LEVELS = ["low", "medium", "high"] as const;
 const quietZoneProfiles: Readonly<Record<string, number>> = QUIET_ZONE_PROFILES;
+
+if (
+  RM_HLE1_ALPHANUMERIC_TABLE.length !== 45 ||
+  RM_HLE1_LOWER_TABLE.length !== 32 ||
+  RM_HLE1_UPPER_TABLE.length !== 32
+) {
+  throw new Error("RM-HLE1 tables have invalid sizes.");
+}
 
 if (quietZoneProfiles.compact !== 2 || quietZoneProfiles.standard !== 4) {
   throw new Error("Quiet Zone profile constants are invalid.");

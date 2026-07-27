@@ -24,7 +24,7 @@ const HEADER_INPUT = {
 describe("RectaMatrix v2 Format Header", () => {
   it("constructs the exact 32-bit information word and RS protection", () => {
     const information = buildHeaderInformation(HEADER_INPUT);
-    expect(information).toEqual(Uint8Array.of(0xa2, 0x65, 0x83, 0x08));
+    expect(information).toEqual(Uint8Array.of(0xa2, 0x69, 0x83, 0x08));
     const protectedHeader = buildProtectedHeader(HEADER_INPUT);
     expect(protectedHeader.slice(0, 4)).toEqual(information);
     expect(protectedHeader).toHaveLength(8);

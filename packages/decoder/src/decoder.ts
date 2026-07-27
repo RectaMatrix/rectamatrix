@@ -16,6 +16,7 @@ import {
   readCodewordsFromBodyBits,
   reassembleFrame,
   reedSolomonDecode,
+  rmhle1Decode,
   rmlz1Decode,
   type Coordinate,
   type HeaderFields,
@@ -516,6 +517,21 @@ function decodeBody(
   let originalPayload: Uint8Array;
   if (header.compression === "none") {
     originalPayload = encodedPayload;
+  } else if (header.compression === "rm-hle1") {
+    if (header.payloadType !== "utf8") {
+      throw new DecoderFailure(
+        "DECOMPRESSION_FAILURE",
+        "RM-HLE1 cannot be used with a binary Payload.",
+      );
+    }
+    try {
+      originalPayload = rmhle1Decode(encodedPayload);
+    } catch {
+      throw new DecoderFailure(
+        "DECOMPRESSION_FAILURE",
+        "RM-HLE1 Payload decoding failed.",
+      );
+    }
   } else {
     try {
       const lengthPrefix = decodeOriginalLengthPrefix(encodedPayload);

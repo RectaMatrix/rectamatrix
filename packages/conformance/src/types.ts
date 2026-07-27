@@ -36,7 +36,7 @@ export interface EncoderVectorExpected {
   readonly width: number;
   readonly height: number;
   readonly payloadType: PayloadType;
-  readonly compression: "none" | "rm-lz1";
+  readonly compression: "none" | "rm-hle1" | "rm-lz1";
   readonly eccLevel: EccLevel;
   readonly maskId: MaskId;
   readonly originalLength: number;
@@ -137,7 +137,7 @@ export interface DecoderPositiveMetadataExpected {
   readonly width: number;
   readonly height: number;
   readonly eccLevel: EccLevel;
-  readonly compression: "none" | "rm-lz1";
+  readonly compression: "none" | "rm-hle1" | "rm-lz1";
   readonly maskId: MaskId;
   readonly quality: DecoderPositiveQualityExpected;
 }

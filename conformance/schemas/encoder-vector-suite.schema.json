@@ -54,7 +54,7 @@
       "required": ["eccLevel", "compression"],
       "properties": {
         "eccLevel": { "enum": ["low", "medium", "high"] },
-        "compression": { "enum": ["none", "rm-lz1", "auto"] },
+        "compression": { "enum": ["none", "rm-hle1", "rm-lz1", "auto"] },
         "sizeId": { "type": "integer", "minimum": 0, "maximum": 29 }
       }
     },
@@ -117,7 +117,7 @@
         },
         "height": { "enum": [16, 20, 24, 28, 32, 40, 48, 64, 80, 96] },
         "payloadType": { "enum": ["binary", "utf8"] },
-        "compression": { "enum": ["none", "rm-lz1"] },
+        "compression": { "enum": ["none", "rm-hle1", "rm-lz1"] },
         "eccLevel": { "enum": ["low", "medium", "high"] },
         "maskId": { "type": "integer", "minimum": 0, "maximum": 3 },
         "originalLength": {

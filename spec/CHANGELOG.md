@@ -3,6 +3,14 @@
 This file records changes to the encoded symbol format, independently of
 implementation-only changes.
 
+## Version 2 working draft - RM-HLE1
+
+- Defines and implements deterministic RM-HLE1 segment framing.
+- Adds Numeric, Alphanumeric, Lower, Upper, URL Token, and Byte modes.
+- Uses dynamic programming to minimize the complete high-level bitstream.
+- Adds automatic selection between Raw, RM-HLE1, and RM-LZ1.
+- Adds RM-HLE1 encoder, decoder, negative handling, and conformance vectors.
+
 ## Version 2 architecture draft - 2026-07-27
 
 - Proposes a 64-bit independently protected Format Header with a fixed four-bit

@@ -33,7 +33,7 @@ execute every sampled-matrix case, verify each PGM checksum byte-for-byte, and
 run every image through the detector. A stale or manually changed artifact
 causes a non-zero exit.
 
-The 15 positive decoder vectors cover:
+The 16 positive decoder vectors cover:
 
 - clean Binary and compressed UTF-8 decoding;
 - exact maximum unknown-error correction for Low, Medium, and High ECC;
@@ -49,7 +49,7 @@ confidence and detector metadata, recovered Payload, symbol metadata, selected
 Erasure profiles, correction counts, attempt count, structural scores, and
 complete `rmx-cv-1` quality report. All values must match exactly.
 
-The 19 negative decoder vectors cover:
+The 20 negative decoder vectors cover:
 
 - unsupported and non-rectangular geometry;
 - invalid confidence dimensions and values;

@@ -206,7 +206,8 @@ function decodePayloadType(bits: number): PayloadType {
 
 function decodeCompression(bits: number): CompressionMode {
   if (bits === 0) return "none";
-  if (bits === 1) return "rm-lz1";
+  if (bits === 1) return "rm-hle1";
+  if (bits === 2) return "rm-lz1";
   throw new RectaMatrixError(
     "UNSUPPORTED_COMPRESSION",
     "Reserved Codec ID is unsupported.",

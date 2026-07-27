@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import {
   CALCULATED_CAPACITIES,
+  COMPRESSION_MODE_VALUES,
   CRC32C_PARAMETERS,
   GF256_PARAMETERS,
   HEADER_BITS,
@@ -16,6 +17,12 @@ import {
   RECTAMATRIX_SIZES,
   SYMBOL_VERSION,
 } from "../packages/core/src/generated/spec-constants.js";
+import {
+  RM_HLE1_ALPHANUMERIC_TABLE,
+  RM_HLE1_LOWER_TABLE,
+  RM_HLE1_UPPER_TABLE,
+  RM_HLE1_URL_TOKENS,
+} from "../packages/core/src/rmhle1.js";
 
 const rootDirectory = `${String(import.meta.dirname)}/..`;
 const outputPath = `${rootDirectory}/conformance/generated/spec-constants.json`;
@@ -37,6 +44,13 @@ const document = {
     extendedLengthEscape: 0x0fff,
   },
   sizes,
+  codecs: COMPRESSION_MODE_VALUES,
+  rmHle1: {
+    alphanumericTable: RM_HLE1_ALPHANUMERIC_TABLE,
+    lowerTable: RM_HLE1_LOWER_TABLE,
+    upperTable: RM_HLE1_UPPER_TABLE,
+    urlTokens: RM_HLE1_URL_TOKENS,
+  },
   crc32c: CRC32C_PARAMETERS,
   gf256: GF256_PARAMETERS,
   paddingBytes: PADDING_BYTES,

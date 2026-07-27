@@ -167,10 +167,20 @@ add(
   "header-unsupported-compression",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[1] = (information[1]! & 0xe3) | 0x08;
+      information[1] = (information[1]! & 0xe3) | 0x0c;
     }),
   ),
   ["UNSUPPORTED_COMPRESSION"],
+);
+
+add(
+  "rm-hle1-with-binary-semantics",
+  matrixToRows(
+    replaceHeader(binaryTrace, (information) => {
+      information[1] = (information[1]! & 0xe3) | 0x04;
+    }),
+  ),
+  ["DECOMPRESSION_FAILURE"],
 );
 
 add(

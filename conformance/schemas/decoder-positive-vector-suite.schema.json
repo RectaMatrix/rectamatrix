@@ -136,7 +136,7 @@
         "width": { "enum": [24, 36, 48, 72, 96] },
         "height": { "enum": [16, 24, 32, 48, 64] },
         "eccLevel": { "enum": ["low", "medium", "high"] },
-        "compression": { "enum": ["none", "rm-lz1"] },
+        "compression": { "enum": ["none", "rm-hle1", "rm-lz1"] },
         "maskId": { "type": "integer", "minimum": 0, "maximum": 3 },
         "quality": { "$ref": "#/$defs/quality" }
       }

@@ -5,7 +5,7 @@ import type {
   SizeId,
 } from "@rectamatrix/core";
 
-export type CompressionMode = "none" | "rm-lz1" | "auto";
+export type CompressionMode = "none" | "rm-hle1" | "rm-lz1" | "auto";
 
 export interface EncodeOptions {
   readonly eccLevel?: EccLevel;
@@ -20,7 +20,7 @@ export interface EncodedSymbol {
   readonly height: number;
   readonly matrix: BooleanMatrix;
   readonly payloadType: "binary" | "utf8";
-  readonly compression: "none" | "rm-lz1";
+  readonly compression: "none" | "rm-hle1" | "rm-lz1";
   readonly eccLevel: EccLevel;
   readonly maskId: MaskId;
   readonly originalLength: number;

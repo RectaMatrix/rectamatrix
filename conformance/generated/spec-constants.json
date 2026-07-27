@@ -462,6 +462,34 @@
       }
     }
   ],
+  "codecs": {
+    "none": 0,
+    "rm-hle1": 1,
+    "rm-lz1": 2
+  },
+  "rmHle1": {
+    "alphanumericTable": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:",
+    "lowerTable": " abcdefghijklmnopqrstuvwxyz.,-_/",
+    "upperTable": " ABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_/",
+    "urlTokens": [
+      "https://",
+      "http://",
+      "www.",
+      ".com",
+      ".org",
+      ".net",
+      ".de",
+      "/",
+      "?",
+      "&",
+      "=",
+      "#",
+      ":",
+      ".",
+      "-",
+      "_"
+    ]
+  },
   "crc32c": {
     "reflectedPolynomial": 2197175160,
     "initialValue": 4294967295,
