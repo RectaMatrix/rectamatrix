@@ -219,6 +219,31 @@ describe("RectaMatrix image detector", () => {
     }
   });
 
+  it("refines projective corners relative to a rotated anchor", () => {
+    const text = "Rotated perspective";
+    const symbol = encodeText(text, {
+      sizeId: 1,
+      eccLevel: "high",
+      compression: "none",
+    });
+    const quadrilateral = Object.freeze([
+      Object.freeze({ x: 42, y: 28 }),
+      Object.freeze({ x: 281, y: 48 }),
+      Object.freeze({ x: 249, y: 198 }),
+      Object.freeze({ x: 65, y: 176 }),
+    ]) as SourceQuadrilateral;
+    const scene = rotateClockwise(
+      renderPerspective(symbol.matrix, 320, 225, quadrilateral),
+    );
+    const result = decodeImageData(scene);
+
+    expect(result.ok).toBe(true);
+    if (result.ok && result.type === "utf8") {
+      expect(result.text).toBe(text);
+      expect(result.vision.orientationDegrees).toBe(90);
+    }
+  });
+
   it("handles uneven illumination, isolated noise, glare, and small clutter", () => {
     const text = "Photo";
     const symbol = encodeText(text, {

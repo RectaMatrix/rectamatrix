@@ -1,9 +1,14 @@
-import { RECTAMATRIX_SIZES, type SymbolSize } from "@rectamatrix/core";
+import {
+  RECTAMATRIX_SIZES,
+  type SizeId,
+  type SymbolSize,
+} from "@rectamatrix/core";
 import {
   DetectorInputError,
   otsuThreshold,
   type GrayscaleImage,
 } from "./image.js";
+import { buildHomography, project } from "./homography.js";
 import type { SourceQuadrilateral } from "./types.js";
 
 const SYMBOL_ASPECT_RATIO = 1.5;
@@ -34,12 +39,29 @@ interface PixelRegion {
 interface RankedQuadrilateral {
   readonly quadrilateral: SourceQuadrilateral;
   readonly rank: number;
+  readonly sizeIds?: readonly SizeId[];
 }
 
 export function detectSceneQuadrilaterals(
   image: GrayscaleImage,
   options: SceneSearchOptions = {},
 ): readonly SourceQuadrilateral[] {
+  return Object.freeze(
+    detectSceneCandidates(image, options).map(
+      ({ quadrilateral }) => quadrilateral,
+    ),
+  );
+}
+
+export interface SceneCandidate {
+  readonly quadrilateral: SourceQuadrilateral;
+  readonly sizeIds: readonly SizeId[];
+}
+
+export function detectSceneCandidates(
+  image: GrayscaleImage,
+  options: SceneSearchOptions = {},
+): readonly SceneCandidate[] {
   const minimumModulePixels =
     options.minimumModulePixels ?? DEFAULT_MINIMUM_MODULE_PIXELS;
   const maximumCandidates =
@@ -55,12 +77,24 @@ export function detectSceneQuadrilaterals(
     ];
     for (const foreground of masks) {
       const regions = locateRegions(image, foreground, minimumModulePixels);
+      const hasPlausibleRegion = regions.some(hasPlausibleSymbolAspect);
       for (const region of regions) {
+        const hypotheses = createRegionHypotheses(
+          image,
+          region,
+          minimumModulePixels,
+        );
         ranked.push(
-          ...createRegionHypotheses(image, region, minimumModulePixels),
+          ...(hasPlausibleRegion
+            ? rankRegionHypotheses(foreground, image, hypotheses)
+            : hypotheses),
         );
       }
-      if (!regions.some(hasPlausibleSymbolAspect)) {
+      const anchorHypotheses = hasPlausibleRegion
+        ? Object.freeze([])
+        : locateAnchorPatternHypotheses(image, foreground, minimumModulePixels);
+      ranked.push(...anchorHypotheses);
+      if (!hasPlausibleRegion) {
         ranked.push(
           ...locateFixedPatternHypotheses(
             image,
@@ -73,15 +107,660 @@ export function detectSceneQuadrilaterals(
   }
 
   ranked.sort((left, right) => left.rank - right.rank);
-  const unique = new Map<string, SourceQuadrilateral>();
-  for (const { quadrilateral } of ranked) {
+  const allSizeIds = Object.freeze(
+    RECTAMATRIX_SIZES.map(({ sizeId }) => sizeId),
+  );
+  const unique = new Map<string, SceneCandidate>();
+  for (const { quadrilateral, sizeIds = allSizeIds } of ranked) {
     const key = quadrilateral
       .map(({ x, y }) => `${x.toFixed(3)},${y.toFixed(3)}`)
       .join(";");
-    if (!unique.has(key)) unique.set(key, quadrilateral);
+    const existing = unique.get(key);
+    unique.set(
+      key,
+      Object.freeze({
+        quadrilateral,
+        sizeIds: Object.freeze([
+          ...new Set([...(existing?.sizeIds ?? []), ...sizeIds]),
+        ]),
+      }),
+    );
     if (unique.size >= maximumCandidates) break;
   }
   return Object.freeze([...unique.values()]);
+}
+
+interface IntegralMask {
+  readonly width: number;
+  readonly values: Uint32Array;
+}
+
+function locateAnchorPatternHypotheses(
+  image: GrayscaleImage,
+  foreground: Uint8Array,
+  minimumModulePixels: number,
+): readonly RankedQuadrilateral[] {
+  const integral = buildIntegralMask(foreground, image.width, image.height);
+  const minimumAnchorSide = minimumModulePixels * 4;
+  const maximumAnchorSide = Math.min(image.width / 4, image.height / 4);
+  const coarse: {
+    readonly left: number;
+    readonly top: number;
+    readonly anchorSide: number;
+    readonly orientation: 0 | 90 | 180 | 270;
+    readonly score: number;
+  }[] = [];
+
+  for (
+    let anchorSide = minimumAnchorSide;
+    anchorSide <= maximumAnchorSide;
+    anchorSide = Math.max(anchorSide + 1, Math.round(anchorSide * 1.2))
+  ) {
+    const step = Math.max(2, Math.floor(anchorSide / 4));
+    for (const orientation of [0, 90, 180, 270] as const) {
+      const atScale: typeof coarse = [];
+      const symbolWidth =
+        orientation === 90 || orientation === 270
+          ? anchorSide * 4
+          : anchorSide * 6;
+      const symbolHeight =
+        orientation === 90 || orientation === 270
+          ? anchorSide * 6
+          : anchorSide * 4;
+      for (let top = 0; top + symbolHeight <= image.height; top += step) {
+        for (let left = 0; left + symbolWidth <= image.width; left += step) {
+          const score = anchorTemplateScore(
+            integral,
+            left,
+            top,
+            anchorSide,
+            orientation,
+            symbolWidth,
+            symbolHeight,
+          );
+          if (score < 0.79) continue;
+          atScale.push({ left, top, anchorSide, orientation, score });
+        }
+      }
+      atScale.sort((left, right) => right.score - left.score);
+      let retained = 0;
+      for (const candidate of atScale) {
+        if (
+          coarse.some(
+            (existing) =>
+              existing.orientation === candidate.orientation &&
+              Math.abs(existing.anchorSide - candidate.anchorSide) <
+                candidate.anchorSide * 0.08 &&
+              Math.hypot(
+                existing.left - candidate.left,
+                existing.top - candidate.top,
+              ) <
+                candidate.anchorSide * 0.7,
+          )
+        ) {
+          continue;
+        }
+        coarse.push(candidate);
+        retained += 1;
+        if (retained >= 16) break;
+      }
+    }
+  }
+
+  const hypotheses: RankedQuadrilateral[] = [];
+  for (const seed of coarse.slice(0, 1_280)) {
+    const refined = refineAnchorTemplate(integral, image, seed);
+    const axisAligned = anchorRectangle(
+      refined.left,
+      refined.top,
+      refined.anchorSide,
+      refined.orientation,
+    );
+    const bestBySize: {
+      readonly quadrilateral: SourceQuadrilateral;
+      readonly size: SymbolSize;
+      readonly score: number;
+    }[] = [];
+    for (const size of RECTAMATRIX_SIZES) {
+      let best:
+        | {
+            readonly quadrilateral: SourceQuadrilateral;
+            readonly size: SymbolSize;
+            readonly score: number;
+          }
+        | undefined;
+      for (let angle = -15; angle <= 15; angle += 3) {
+        const quadrilateral = rotateQuadrilateralAtAnchor(
+          axisAligned,
+          refined.orientation,
+          (angle * Math.PI) / 180,
+        );
+        if (!quadrilateralInsideImage(quadrilateral, image)) continue;
+        const score = fixedPatternQuadrilateralScore(
+          foreground,
+          image.width,
+          quadrilateral,
+          size,
+          refined.orientation,
+        );
+        if (best === undefined || score > best.score) {
+          best = { quadrilateral, size, score };
+        }
+      }
+      if (best !== undefined) bestBySize.push(best);
+    }
+    bestBySize.sort((left, right) => right.score - left.score);
+    const strongestScore = bestBySize[0]?.score ?? 0;
+    const competitiveSizes = bestBySize
+      .filter(({ score }) => score >= 0.62 && score >= strongestScore - 0.08)
+      .slice(0, 3);
+    for (const best of competitiveSizes) {
+      if (
+        hypotheses.some(
+          (existing) =>
+            existing.sizeIds?.includes(best.size.sizeId) === true &&
+            rectangleIntersectionOverUnion(
+              existing.quadrilateral,
+              best.quadrilateral,
+            ) > 0.82,
+        )
+      ) {
+        continue;
+      }
+      const optimized = refinePatternQuadrilateral(
+        foreground,
+        image,
+        best.quadrilateral,
+        best.size,
+        refined.orientation,
+        refined.anchorSide,
+      );
+      const quadrilateral = optimized.quadrilateral;
+      if (
+        hypotheses.some(
+          (existing) =>
+            existing.sizeIds?.includes(best.size.sizeId) === true &&
+            rectangleIntersectionOverUnion(
+              existing.quadrilateral,
+              quadrilateral,
+            ) > 0.72,
+        )
+      ) {
+        continue;
+      }
+      hypotheses.push(
+        Object.freeze({
+          quadrilateral,
+          rank: 10 - refined.score - optimized.score,
+          sizeIds: Object.freeze([best.size.sizeId]),
+        }),
+      );
+      if (hypotheses.length >= 64) break;
+    }
+    if (hypotheses.length >= 64) break;
+  }
+  return Object.freeze(hypotheses);
+}
+
+function rankRegionHypotheses(
+  foreground: Uint8Array,
+  image: GrayscaleImage,
+  hypotheses: readonly RankedQuadrilateral[],
+): readonly RankedQuadrilateral[] {
+  return hypotheses.map((hypothesis) => {
+    let fixedScore = 0;
+    const sizeScores: { readonly sizeId: SizeId; readonly score: number }[] =
+      [];
+    for (const size of RECTAMATRIX_SIZES) {
+      let sizeScore = 0;
+      for (const orientation of [0, 90, 180, 270] as const) {
+        sizeScore = Math.max(
+          sizeScore,
+          fixedPatternQuadrilateralScore(
+            foreground,
+            image.width,
+            hypothesis.quadrilateral,
+            size,
+            orientation,
+          ),
+        );
+      }
+      fixedScore = Math.max(fixedScore, sizeScore);
+      sizeScores.push({ sizeId: size.sizeId, score: sizeScore });
+    }
+    const competitiveSizeIds =
+      fixedScore < 0.62
+        ? undefined
+        : sizeScores
+            .sort((left, right) => right.score - left.score)
+            .filter(({ score }) => score >= fixedScore - 0.08)
+            .slice(0, 3)
+            .map(({ sizeId }) => sizeId);
+    const width = distance(
+      hypothesis.quadrilateral[0],
+      hypothesis.quadrilateral[1],
+    );
+    const height = distance(
+      hypothesis.quadrilateral[0],
+      hypothesis.quadrilateral[3],
+    );
+    const areaRatio = (width * height) / (image.width * image.height);
+    const scaleScore = Math.exp(
+      -Math.abs(Math.log(Math.max(areaRatio, 1e-9) / 0.08)) * 1.15,
+    );
+    return Object.freeze({
+      ...hypothesis,
+      rank: hypothesis.rank - fixedScore * 2 - scaleScore * 0.85,
+      ...(competitiveSizeIds === undefined
+        ? {}
+        : { sizeIds: Object.freeze(competitiveSizeIds) }),
+    });
+  });
+}
+
+function buildIntegralMask(
+  foreground: Uint8Array,
+  width: number,
+  height: number,
+): IntegralMask {
+  const stride = width + 1;
+  const values = new Uint32Array(stride * (height + 1));
+  for (let y = 0; y < height; y += 1) {
+    let rowSum = 0;
+    for (let x = 0; x < width; x += 1) {
+      rowSum += foreground[y * width + x]!;
+      values[(y + 1) * stride + x + 1] = values[y * stride + x + 1]! + rowSum;
+    }
+  }
+  return Object.freeze({ width, values });
+}
+
+function maskRatio(
+  integral: IntegralMask,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): number {
+  const stride = integral.width + 1;
+  const x0 = Math.max(0, Math.floor(left));
+  const y0 = Math.max(0, Math.floor(top));
+  const x1 = Math.min(integral.width, Math.ceil(right));
+  const y1 = Math.min(integral.values.length / stride - 1, Math.ceil(bottom));
+  if (x1 <= x0 || y1 <= y0) return 0.5;
+  const sum =
+    integral.values[y1 * stride + x1]! -
+    integral.values[y0 * stride + x1]! -
+    integral.values[y1 * stride + x0]! +
+    integral.values[y0 * stride + x0]!;
+  return sum / ((x1 - x0) * (y1 - y0));
+}
+
+function anchorTemplateScore(
+  integral: IntegralMask,
+  left: number,
+  top: number,
+  anchorSide: number,
+  orientation: 0 | 90 | 180 | 270,
+  symbolWidth: number,
+  symbolHeight: number,
+): number {
+  const anchorLeft =
+    orientation === 90 || orientation === 180
+      ? left + symbolWidth - anchorSide
+      : left;
+  const anchorTop =
+    orientation === 180 || orientation === 270
+      ? top + symbolHeight - anchorSide
+      : top;
+  const half = anchorSide / 2;
+  const quadrants = [
+    maskRatio(
+      integral,
+      anchorLeft,
+      anchorTop,
+      anchorLeft + half,
+      anchorTop + half,
+    ),
+    maskRatio(
+      integral,
+      anchorLeft + half,
+      anchorTop,
+      anchorLeft + anchorSide,
+      anchorTop + half,
+    ),
+    maskRatio(
+      integral,
+      anchorLeft,
+      anchorTop + half,
+      anchorLeft + half,
+      anchorTop + anchorSide,
+    ),
+    maskRatio(
+      integral,
+      anchorLeft + half,
+      anchorTop + half,
+      anchorLeft + anchorSide,
+      anchorTop + anchorSide,
+    ),
+  ];
+  const whiteIndex =
+    orientation / 90 === 0
+      ? 3
+      : orientation / 90 === 1
+        ? 2
+        : orientation / 90 === 2
+          ? 0
+          : 1;
+  let black = 0;
+  for (let index = 0; index < quadrants.length; index += 1) {
+    if (index !== whiteIndex) black += quadrants[index]!;
+  }
+  const band = Math.max(2, anchorSide * 0.22);
+  const quiet =
+    orientation === 0
+      ? [
+          maskRatio(
+            integral,
+            anchorLeft,
+            anchorTop - band,
+            anchorLeft + anchorSide,
+            anchorTop,
+          ),
+          maskRatio(
+            integral,
+            anchorLeft - band,
+            anchorTop,
+            anchorLeft,
+            anchorTop + anchorSide,
+          ),
+        ]
+      : orientation === 90
+        ? [
+            maskRatio(
+              integral,
+              anchorLeft,
+              anchorTop - band,
+              anchorLeft + anchorSide,
+              anchorTop,
+            ),
+            maskRatio(
+              integral,
+              anchorLeft + anchorSide,
+              anchorTop,
+              anchorLeft + anchorSide + band,
+              anchorTop + anchorSide,
+            ),
+          ]
+        : orientation === 180
+          ? [
+              maskRatio(
+                integral,
+                anchorLeft,
+                anchorTop + anchorSide,
+                anchorLeft + anchorSide,
+                anchorTop + anchorSide + band,
+              ),
+              maskRatio(
+                integral,
+                anchorLeft + anchorSide,
+                anchorTop,
+                anchorLeft + anchorSide + band,
+                anchorTop + anchorSide,
+              ),
+            ]
+          : [
+              maskRatio(
+                integral,
+                anchorLeft,
+                anchorTop + anchorSide,
+                anchorLeft + anchorSide,
+                anchorTop + anchorSide + band,
+              ),
+              maskRatio(
+                integral,
+                anchorLeft - band,
+                anchorTop,
+                anchorLeft,
+                anchorTop + anchorSide,
+              ),
+            ];
+  const anchorScore = (black + (1 - quadrants[whiteIndex]!)) / 4;
+  const quietScore = 1 - (quiet[0]! + quiet[1]!) / 2;
+  return anchorScore * 0.82 + quietScore * 0.18;
+}
+
+function refineAnchorTemplate(
+  integral: IntegralMask,
+  image: GrayscaleImage,
+  seed: {
+    readonly left: number;
+    readonly top: number;
+    readonly anchorSide: number;
+    readonly orientation: 0 | 90 | 180 | 270;
+    readonly score: number;
+  },
+): typeof seed {
+  let best = seed;
+  let positionStep = Math.max(1, seed.anchorSide / 5);
+  let scaleStep = Math.max(1, seed.anchorSide * 0.08);
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    for (const dx of [-positionStep, 0, positionStep]) {
+      for (const dy of [-positionStep, 0, positionStep]) {
+        for (const ds of [-scaleStep, 0, scaleStep]) {
+          const anchorSide = best.anchorSide + ds;
+          if (anchorSide < 8) continue;
+          const symbolWidth =
+            best.orientation === 90 || best.orientation === 270
+              ? anchorSide * 4
+              : anchorSide * 6;
+          const symbolHeight =
+            best.orientation === 90 || best.orientation === 270
+              ? anchorSide * 6
+              : anchorSide * 4;
+          const left = best.left + dx;
+          const top = best.top + dy;
+          if (
+            left < 0 ||
+            top < 0 ||
+            left + symbolWidth > image.width ||
+            top + symbolHeight > image.height
+          ) {
+            continue;
+          }
+          const score = anchorTemplateScore(
+            integral,
+            left,
+            top,
+            anchorSide,
+            best.orientation,
+            symbolWidth,
+            symbolHeight,
+          );
+          if (score > best.score) {
+            best = Object.freeze({
+              left,
+              top,
+              anchorSide,
+              orientation: best.orientation,
+              score,
+            });
+          }
+        }
+      }
+    }
+    positionStep *= 0.5;
+    scaleStep *= 0.5;
+  }
+  return best;
+}
+
+function anchorRectangle(
+  left: number,
+  top: number,
+  anchorSide: number,
+  orientation: 0 | 90 | 180 | 270,
+): SourceQuadrilateral {
+  const width =
+    orientation === 90 || orientation === 270 ? anchorSide * 4 : anchorSide * 6;
+  const height =
+    orientation === 90 || orientation === 270 ? anchorSide * 6 : anchorSide * 4;
+  return Object.freeze([
+    Object.freeze({ x: left, y: top }),
+    Object.freeze({ x: left + width, y: top }),
+    Object.freeze({ x: left + width, y: top + height }),
+    Object.freeze({ x: left, y: top + height }),
+  ]);
+}
+
+function rotateQuadrilateralAtAnchor(
+  quadrilateral: SourceQuadrilateral,
+  orientation: 0 | 90 | 180 | 270,
+  angle: number,
+): SourceQuadrilateral {
+  const anchor = quadrilateral[orientation / 90]!;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  return Object.freeze(
+    quadrilateral.map((point) => {
+      const dx = point.x - anchor.x;
+      const dy = point.y - anchor.y;
+      return Object.freeze({
+        x: anchor.x + dx * cosine - dy * sine,
+        y: anchor.y + dx * sine + dy * cosine,
+      });
+    }),
+  ) as SourceQuadrilateral;
+}
+
+function quadrilateralInsideImage(
+  quadrilateral: SourceQuadrilateral,
+  image: GrayscaleImage,
+): boolean {
+  return quadrilateral.every(
+    ({ x, y }) =>
+      x >= -0.5 &&
+      y >= -0.5 &&
+      x <= image.width - 0.5 &&
+      y <= image.height - 0.5,
+  );
+}
+
+function fixedPatternQuadrilateralScore(
+  foreground: Uint8Array,
+  imageWidth: number,
+  quadrilateral: SourceQuadrilateral,
+  size: SymbolSize,
+  orientation: 0 | 90 | 180 | 270,
+): number {
+  const offset = orientation / 90;
+  const oriented: SourceQuadrilateral = Object.freeze([
+    quadrilateral[offset % 4]!,
+    quadrilateral[(offset + 1) % 4]!,
+    quadrilateral[(offset + 2) % 4]!,
+    quadrilateral[(offset + 3) % 4]!,
+  ]);
+  let homography: ReturnType<typeof buildHomography>;
+  try {
+    homography = buildHomography(size.width, size.height, oriented);
+  } catch {
+    return 0;
+  }
+  let anchorCorrect = 0;
+  let anchorCount = 0;
+  let clockCorrect = 0;
+  let clockCount = 0;
+  const probe = (
+    moduleX: number,
+    moduleY: number,
+    expected: boolean,
+    anchor: boolean,
+  ): void => {
+    const point = project(homography, moduleX + 0.5, moduleY + 0.5);
+    const x = Math.round(point.x);
+    const y = Math.round(point.y);
+    if (x < 0 || y < 0 || x >= imageWidth) return;
+    const actual = foreground[y * imageWidth + x] !== 0;
+    if (anchor) {
+      if (actual === expected) anchorCorrect += 1;
+      anchorCount += 1;
+    } else {
+      if (actual === expected) clockCorrect += 1;
+      clockCount += 1;
+    }
+  };
+  for (let y = 0; y < size.anchorSize; y += 1) {
+    for (let x = 0; x < size.anchorSize; x += 1) {
+      const half = size.anchorSize / 2;
+      probe(x, y, !(x >= half && y >= half), true);
+    }
+  }
+  for (let x = size.anchorSize; x < size.width; x += 1) {
+    probe(x, 0, (x - size.anchorSize) % 2 === 0, false);
+  }
+  for (let y = size.anchorSize; y < size.height; y += 1) {
+    probe(0, y, (y - size.anchorSize) % 2 === 0, false);
+  }
+  if (anchorCount === 0 || clockCount === 0) return 0;
+  return (
+    (anchorCorrect / anchorCount) * 0.35 + (clockCorrect / clockCount) * 0.65
+  );
+}
+
+function refinePatternQuadrilateral(
+  foreground: Uint8Array,
+  image: GrayscaleImage,
+  initial: SourceQuadrilateral,
+  size: SymbolSize,
+  orientation: 0 | 90 | 180 | 270,
+  anchorSide: number,
+): {
+  readonly quadrilateral: SourceQuadrilateral;
+  readonly score: number;
+} {
+  let best = {
+    quadrilateral: initial,
+    score: fixedPatternQuadrilateralScore(
+      foreground,
+      image.width,
+      initial,
+      size,
+      orientation,
+    ),
+  };
+  const anchorCorner = orientation / 90;
+  for (const [corner, radius] of [
+    [(anchorCorner + 1) % 4, anchorSide],
+    [(anchorCorner + 3) % 4, anchorSide],
+    [anchorCorner, anchorSide * 0.35],
+    [(anchorCorner + 2) % 4, anchorSide * 0.7],
+  ] as const) {
+    const origin = best.quadrilateral[corner]!;
+    const step = Math.max(1, radius / 8);
+    let cornerBest = best;
+    for (let dy = -radius; dy <= radius + 1e-9; dy += step) {
+      for (let dx = -radius; dx <= radius + 1e-9; dx += step) {
+        const points = best.quadrilateral.map((point) => ({ ...point }));
+        points[corner] = { x: origin.x + dx, y: origin.y + dy };
+        const quadrilateral = Object.freeze(
+          points.map((point) => Object.freeze(point)),
+        ) as SourceQuadrilateral;
+        if (!quadrilateralInsideImage(quadrilateral, image)) continue;
+        const score = fixedPatternQuadrilateralScore(
+          foreground,
+          image.width,
+          quadrilateral,
+          size,
+          orientation,
+        );
+        if (score > cornerBest.score) {
+          cornerBest = { quadrilateral, score };
+        }
+      }
+    }
+    best = cornerBest;
+  }
+  return Object.freeze(best);
 }
 
 function hasPlausibleSymbolAspect(region: PixelRegion): boolean {

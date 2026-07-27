@@ -87,7 +87,15 @@ export interface BrowserEnvironment {
 export interface FrameCaptureOptions {
   readonly maximumPixels?: number;
   readonly maximumDimension?: number;
+  readonly regionOfInterest?: NormalizedRegionOfInterest;
   readonly environment?: Pick<BrowserEnvironment, "createCanvas">;
+}
+
+export interface NormalizedRegionOfInterest {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface DecodeVideoFrameOptions extends FrameCaptureOptions {

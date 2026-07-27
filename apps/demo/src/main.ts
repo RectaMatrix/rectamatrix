@@ -12,6 +12,7 @@ import {
   type EncodedSymbol,
   type QuietZoneProfile,
 } from "@rectamatrix/encoder";
+import { cameraOptionLabel, rankCameraDevices } from "./camera.js";
 import "./style.css";
 
 const video = requiredElement("camera", HTMLVideoElement);
@@ -20,6 +21,14 @@ const stopButton = requiredElement("stop-button", HTMLButtonElement);
 const copyButton = requiredElement("copy-button", HTMLButtonElement);
 const scannerStatus = requiredElement("scanner-status", HTMLSpanElement);
 const cameraBadgeText = requiredElement("camera-badge-text", HTMLSpanElement);
+const cameraNote = requiredElement("camera-note", HTMLParagraphElement);
+const cameraDevice = requiredElement("camera-device", HTMLSelectElement);
+const cameraZoomControl = requiredElement(
+  "camera-zoom-control",
+  HTMLLabelElement,
+);
+const cameraZoom = requiredElement("camera-zoom", HTMLInputElement);
+const cameraZoomValue = requiredElement("camera-zoom-value", HTMLOutputElement);
 const resultTitle = requiredElement("result-title", HTMLHeadingElement);
 const resultCount = requiredElement("result-count", HTMLSpanElement);
 const resultOutput = requiredElement("result-output", HTMLDivElement);
@@ -64,6 +73,18 @@ let successfulScans = 0;
 let copyValue = "";
 let generatedCode: GeneratedCode | undefined;
 let previewUrl: string | undefined;
+let selectedCameraDeviceId: string | undefined;
+let activeCameraTrack: MediaStreamTrack | undefined;
+
+interface CameraCapabilities extends MediaTrackCapabilities {
+  readonly exposureMode?: readonly string[];
+  readonly focusMode?: readonly string[];
+  readonly zoom?: MediaSettingsRange;
+}
+
+interface CameraSettings extends MediaTrackSettings {
+  readonly zoom?: number;
+}
 
 interface GeneratedCode {
   readonly symbol: EncodedSymbol;
@@ -74,10 +95,19 @@ interface GeneratedCode {
 }
 
 const scanner = new RectaMatrixCameraScanner(video, {
-  scanIntervalMilliseconds: 240,
+  scanIntervalMilliseconds: 160,
   stopOnSuccess: false,
+  stopProvidedStream: true,
+  maximumDimension: 720,
+  maximumPixels: 500_000,
+  regionOfInterest: Object.freeze({
+    left: 0.08,
+    top: 0.08,
+    width: 0.84,
+    height: 0.84,
+  }),
   detector: {
-    maximumCandidates: 48,
+    maximumCandidates: 8,
     minimumModulePixels: 3,
   },
   onDecode(result) {
@@ -93,6 +123,16 @@ startButton.addEventListener("click", () => {
 });
 stopButton.addEventListener("click", () => {
   stopCamera();
+});
+cameraDevice.addEventListener("change", () => {
+  selectedCameraDeviceId = cameraDevice.value || undefined;
+  if (scanner.running) void restartCamera();
+});
+cameraZoom.addEventListener("input", () => {
+  cameraZoomValue.value = formatZoom(Number(cameraZoom.value));
+});
+cameraZoom.addEventListener("change", () => {
+  void applyCameraZoom();
 });
 copyButton.addEventListener("click", () => {
   void copyResult();
@@ -127,22 +167,202 @@ generateCode();
 async function startCamera(): Promise<void> {
   setInterfaceState("starting", "Kamerazugriff wird angefragt …");
   startButton.disabled = true;
+  cameraDevice.disabled = true;
+  let stream: MediaStream | undefined;
   try {
-    await scanner.start();
+    stream = await openPreferredCamera();
+    const track = requireVideoTrack(stream);
+    await configureCameraTrack(track);
+    await scanner.start(stream);
+    activeCameraTrack = track;
     setInterfaceState("running", "Suche nach einem RectaMatrix-Code");
     stopButton.disabled = false;
+    cameraDevice.disabled = cameraDevice.options.length < 2;
   } catch (error) {
+    if (stream !== undefined) stopStream(stream);
+    activeCameraTrack = undefined;
     showError(error);
     startButton.disabled = false;
     stopButton.disabled = true;
+    cameraDevice.disabled = cameraDevice.options.length < 2;
   }
+}
+
+async function restartCamera(): Promise<void> {
+  scanner.stop();
+  activeCameraTrack = undefined;
+  stopButton.disabled = true;
+  await startCamera();
 }
 
 function stopCamera(): void {
   scanner.stop();
+  activeCameraTrack = undefined;
+  cameraZoom.disabled = true;
   setInterfaceState("idle", "Kamera wurde gestoppt");
   startButton.disabled = false;
   stopButton.disabled = true;
+}
+
+async function openPreferredCamera(): Promise<MediaStream> {
+  const mediaDevices = navigator.mediaDevices;
+  let stream = await mediaDevices.getUserMedia(
+    cameraConstraints(selectedCameraDeviceId),
+  );
+  try {
+    const rankedDevices = rankCameraDevices(
+      await mediaDevices.enumerateDevices(),
+    );
+    const currentDeviceId = requireVideoTrack(stream).getSettings().deviceId;
+    const preferredDevice =
+      rankedDevices.find(
+        ({ device }) => device.deviceId === selectedCameraDeviceId,
+      )?.device ?? rankedDevices[0]?.device;
+
+    if (
+      preferredDevice !== undefined &&
+      preferredDevice.deviceId !== currentDeviceId
+    ) {
+      stopStream(stream);
+      try {
+        stream = await mediaDevices.getUserMedia(
+          cameraConstraints(preferredDevice.deviceId),
+        );
+      } catch {
+        stream = await mediaDevices.getUserMedia(cameraConstraints());
+      }
+    }
+
+    const selectedDeviceId = requireVideoTrack(stream).getSettings().deviceId;
+    selectedCameraDeviceId = selectedDeviceId || preferredDevice?.deviceId;
+    populateCameraDevices(rankedDevices, selectedCameraDeviceId);
+    return stream;
+  } catch (error) {
+    stopStream(stream);
+    throw error;
+  }
+}
+
+function cameraConstraints(deviceId?: string): MediaStreamConstraints {
+  return {
+    audio: false,
+    video: {
+      ...(deviceId === undefined
+        ? { facingMode: { ideal: "environment" } }
+        : { deviceId: { exact: deviceId } }),
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 30, max: 30 },
+    },
+  };
+}
+
+function populateCameraDevices(
+  rankedDevices: ReturnType<typeof rankCameraDevices>,
+  selectedDeviceId: string | undefined,
+): void {
+  cameraDevice.replaceChildren();
+  for (const [index, ranked] of rankedDevices.entries()) {
+    const option = document.createElement("option");
+    option.value = ranked.device.deviceId;
+    option.textContent = cameraOptionLabel(ranked, index);
+    option.selected = ranked.device.deviceId === selectedDeviceId;
+    cameraDevice.append(option);
+  }
+  if (cameraDevice.options.length === 0) {
+    const option = document.createElement("option");
+    option.textContent = "Aktive Rückkamera";
+    cameraDevice.append(option);
+  }
+}
+
+async function configureCameraTrack(track: MediaStreamTrack): Promise<void> {
+  const capabilities = track.getCapabilities() as CameraCapabilities;
+  const advanced: Record<string, string> = {};
+  if (capabilities.focusMode?.includes("continuous") === true) {
+    advanced.focusMode = "continuous";
+  }
+  if (capabilities.exposureMode?.includes("continuous") === true) {
+    advanced.exposureMode = "continuous";
+  }
+  if (Object.keys(advanced).length > 0) {
+    try {
+      await track.applyConstraints({
+        advanced: [advanced],
+      });
+    } catch {
+      // Optional camera controls differ considerably between mobile browsers.
+    }
+  }
+
+  const settings = track.getSettings() as CameraSettings;
+  const width = settings.width;
+  const height = settings.height;
+  cameraNote.textContent =
+    width === undefined || height === undefined
+      ? "Rückkamera · Verarbeitung im Browser"
+      : `${String(width)} × ${String(height)} · Verarbeitung im Browser`;
+  configureZoomControl(capabilities.zoom, settings.zoom);
+}
+
+function configureZoomControl(
+  zoom: MediaSettingsRange | undefined,
+  currentZoom: number | undefined,
+): void {
+  cameraZoom.disabled = true;
+  const minimum = zoom?.min;
+  const maximum = zoom?.max;
+  const step = zoom?.step;
+  const available =
+    typeof minimum === "number" &&
+    typeof maximum === "number" &&
+    Number.isFinite(minimum) &&
+    Number.isFinite(maximum) &&
+    maximum > minimum;
+  cameraZoomControl.hidden = !available;
+  if (!available) return;
+
+  cameraZoom.min = String(minimum);
+  cameraZoom.max = String(maximum);
+  cameraZoom.step = String(typeof step === "number" && step > 0 ? step : 0.1);
+  cameraZoom.value = String(
+    Math.min(maximum, Math.max(minimum, currentZoom ?? 1)),
+  );
+  cameraZoomValue.value = formatZoom(Number(cameraZoom.value));
+  cameraZoom.disabled = false;
+}
+
+async function applyCameraZoom(): Promise<void> {
+  const track = activeCameraTrack;
+  if (track === undefined) return;
+  const zoom = Number(cameraZoom.value);
+  try {
+    await track.applyConstraints({
+      advanced: [{ zoom } as MediaTrackConstraintSet],
+    });
+  } catch {
+    scannerStatus.textContent = "Der gewählte Zoom wird nicht unterstützt";
+  }
+}
+
+function requireVideoTrack(stream: MediaStream): MediaStreamTrack {
+  const track = stream.getVideoTracks()[0];
+  if (track === undefined) {
+    stopStream(stream);
+    throw new BrowserAdapterError(
+      "CAMERA_START_FAILED",
+      "Die Kamera liefert kein Videobild.",
+    );
+  }
+  return track;
+}
+
+function stopStream(stream: MediaStream): void {
+  for (const track of stream.getTracks()) track.stop();
+}
+
+function formatZoom(value: number): string {
+  return `${value.toLocaleString("de-DE", { maximumFractionDigits: 1 })}×`;
 }
 
 function displayResult(result: Extract<ImageDecodeResult, { ok: true }>): void {

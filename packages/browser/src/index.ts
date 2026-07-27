@@ -21,6 +21,7 @@ export {
   type FrameCaptureOptions,
   type MediaStreamLike,
   type MediaStreamTrackLike,
+  type NormalizedRegionOfInterest,
   type RasterCanvasContextLike,
   type RasterCanvasSurfaceLike,
   type RasterRenderOptions,

@@ -9,6 +9,7 @@ import {
   type CanvasSurfaceLike,
   type DecodeVideoFrameOptions,
   type FrameCaptureOptions,
+  type NormalizedRegionOfInterest,
   type VideoElementLike,
 } from "./types.js";
 
@@ -19,9 +20,14 @@ export function captureVideoFrame(
   video: VideoElementLike,
   options: FrameCaptureOptions = {},
 ): ImageDataLike {
-  const dimensions = captureDimensions(
+  const source = captureRegion(
     video.videoWidth,
     video.videoHeight,
+    options.regionOfInterest,
+  );
+  const dimensions = captureDimensions(
+    source.width,
+    source.height,
     options.maximumPixels ?? DEFAULT_MAXIMUM_CAPTURE_PIXELS,
     options.maximumDimension ?? DEFAULT_MAXIMUM_DIMENSION,
   );
@@ -46,10 +52,10 @@ export function captureVideoFrame(
   try {
     context.drawImage(
       video,
-      0,
-      0,
-      video.videoWidth,
-      video.videoHeight,
+      source.left,
+      source.top,
+      source.width,
+      source.height,
       0,
       0,
       dimensions.width,
@@ -117,6 +123,57 @@ export const defaultBrowserEnvironment: BrowserEnvironment = Object.freeze({
     globalThis.clearTimeout(handle);
   },
 });
+
+function captureRegion(
+  sourceWidth: number,
+  sourceHeight: number,
+  region: NormalizedRegionOfInterest | undefined,
+): {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+} {
+  if (region === undefined) {
+    return Object.freeze({
+      left: 0,
+      top: 0,
+      width: sourceWidth,
+      height: sourceHeight,
+    });
+  }
+  const values = [region.left, region.top, region.width, region.height];
+  if (
+    values.some((value) => !Number.isFinite(value)) ||
+    region.left < 0 ||
+    region.top < 0 ||
+    region.width <= 0 ||
+    region.height <= 0 ||
+    region.left + region.width > 1 ||
+    region.top + region.height > 1
+  ) {
+    throw new BrowserAdapterError(
+      "INVALID_OPTIONS",
+      "Region of interest must be a normalized rectangle inside the video.",
+    );
+  }
+  const left = Math.floor(sourceWidth * region.left);
+  const top = Math.floor(sourceHeight * region.top);
+  const right = Math.min(
+    sourceWidth,
+    Math.ceil(sourceWidth * (region.left + region.width)),
+  );
+  const bottom = Math.min(
+    sourceHeight,
+    Math.ceil(sourceHeight * (region.top + region.height)),
+  );
+  return Object.freeze({
+    left,
+    top,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top),
+  });
+}
 
 function captureDimensions(
   sourceWidth: number,

@@ -45,6 +45,34 @@ describe("browser frame capture", () => {
     expect(frame.data).toBeInstanceOf(Uint8ClampedArray);
   });
 
+  it("captures only the normalized scanner region", () => {
+    let drawArguments: readonly number[] | undefined;
+    const context: CanvasContextLike = {
+      drawImage(_source, ...values): void {
+        drawArguments = values;
+      },
+      getImageData(_x, _y, width, height): ImageDataLike {
+        return {
+          width,
+          height,
+          data: new Uint8ClampedArray(width * height * 4),
+        };
+      },
+    };
+    const frame = captureVideoFrame(videoElement(4000, 2000), {
+      maximumDimension: 1000,
+      regionOfInterest: { left: 0.1, top: 0.2, width: 0.5, height: 0.5 },
+      environment: {
+        createCanvas(width, height): CanvasSurfaceLike {
+          return canvasSurface(context, width, height);
+        },
+      },
+    });
+
+    expect(drawArguments).toEqual([400, 400, 2000, 1000, 0, 0, 1000, 500]);
+    expect(frame).toMatchObject({ width: 1000, height: 500 });
+  });
+
   it("captures and decodes a RectaMatrix video frame", () => {
     const symbol = encodeText("Camera", {
       sizeId: 0,
@@ -92,6 +120,13 @@ describe("browser frame capture", () => {
     );
     expectAdapterError(
       () => captureVideoFrame(videoElement(10, 10), { maximumPixels: 0 }),
+      "INVALID_OPTIONS",
+    );
+    expectAdapterError(
+      () =>
+        captureVideoFrame(videoElement(10, 10), {
+          regionOfInterest: { left: 0.5, top: 0, width: 0.6, height: 1 },
+        }),
       "INVALID_OPTIONS",
     );
   });
