@@ -245,7 +245,7 @@ add(
 
 const multiBlockPayload = deterministicBytes(300, 211);
 const multiBlockTrace = encodeBytesWithTrace(multiBlockPayload, {
-  sizeId: 3,
+  sizeId: 6,
   eccLevel: "medium",
   compression: "none",
 });

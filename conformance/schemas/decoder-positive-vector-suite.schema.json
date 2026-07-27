@@ -8,7 +8,7 @@
   "properties": {
     "format": { "const": "rectamatrix-conformance" },
     "vectorVersion": { "const": 1 },
-    "coreVersion": { "const": 1 },
+    "coreVersion": { "const": 2 },
     "kind": { "const": "decoder-positive" },
     "vectors": {
       "type": "array",
@@ -81,7 +81,7 @@
         "crcValid"
       ],
       "properties": {
-        "profile": { "const": "rmx-cv-1" },
+        "profile": { "const": "rmx-v2-draft" },
         "overallConfidence": {
           "type": "number",
           "minimum": 0,
@@ -131,8 +131,8 @@
         "quality"
       ],
       "properties": {
-        "version": { "const": 1 },
-        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "version": { "const": 2 },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 29 },
         "width": { "enum": [24, 36, 48, 72, 96] },
         "height": { "enum": [16, 24, 32, 48, 64] },
         "eccLevel": { "enum": ["low", "medium", "high"] },

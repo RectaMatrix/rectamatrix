@@ -31,7 +31,7 @@ export function validateEncoderVectorSuite(
   );
   literal(suite.format, "rectamatrix-conformance", "suite.format");
   literal(suite.vectorVersion, 1, "suite.vectorVersion");
-  literal(suite.coreVersion, 1, "suite.coreVersion");
+  literal(suite.coreVersion, 2, "suite.coreVersion");
   literal(suite.kind, "encoder", "suite.kind");
   if (!Array.isArray(suite.vectors) || suite.vectors.length === 0) {
     fail("suite.vectors must be a non-empty array.");
@@ -150,7 +150,7 @@ function validateExpected(
   );
   integer(expected.maskId, 0, 3, `${path}.maskId`);
   integer(expected.originalLength, 0, 0xffff, `${path}.originalLength`);
-  integer(expected.encodedLength, 0, 0xffff, `${path}.encodedLength`);
+  integer(expected.encodedLength, 0, 0x0ffe, `${path}.encodedLength`);
   for (const key of [
     "originalPayloadHex",
     "encodedPayloadHex",
@@ -165,11 +165,11 @@ function validateExpected(
   if ((expected.crc32cHex as string).length !== 8) {
     fail(`${path}.crc32cHex must contain four bytes.`);
   }
-  if ((expected.headerInformationHex as string).length !== 16) {
-    fail(`${path}.headerInformationHex must contain eight bytes.`);
+  if ((expected.headerInformationHex as string).length !== 8) {
+    fail(`${path}.headerInformationHex must contain four bytes.`);
   }
-  if ((expected.protectedHeaderHex as string).length !== 24) {
-    fail(`${path}.protectedHeaderHex must contain twelve bytes.`);
+  if ((expected.protectedHeaderHex as string).length !== 16) {
+    fail(`${path}.protectedHeaderHex must contain eight bytes.`);
   }
   integer(expected.rsBlockCount, 1, 0xffff + 4, `${path}.rsBlockCount`);
   integer(expected.rsTotalDataBytes, 4, 0xffff + 4, `${path}.rsTotalDataBytes`);
@@ -302,7 +302,7 @@ function integer(
 }
 
 function sizeId(value: unknown, path: string): asserts value is SizeId {
-  integer(value, 0, 6, path);
+  integer(value, 0, RECTAMATRIX_SIZES.length - 1, path);
 }
 
 function enumeration<T extends string>(

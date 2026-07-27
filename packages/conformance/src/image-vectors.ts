@@ -45,7 +45,15 @@ export function createImageSuccessVector(
     result.metadata.quality.overallConfidence <
       expectation.minimumOverallConfidence
   ) {
-    throw new Error(`Image fixture "${id}" produced an unexpected result.`);
+    throw new Error(
+      `Image fixture "${id}" produced an unexpected result: ${JSON.stringify({
+        type: result.type,
+        bytes: Array.from(result.bytes),
+        sizeId: result.metadata.sizeId,
+        orientationDegrees: result.vision.orientationDegrees,
+        overallConfidence: result.metadata.quality.overallConfidence,
+      })}.`,
+    );
   }
   if (
     result.type === "utf8" &&
@@ -119,7 +127,7 @@ export function createImageVectorSuite(
   return Object.freeze({
     format: "rectamatrix-conformance",
     vectorVersion: 1,
-    coreVersion: 1,
+    coreVersion: 2,
     kind: "image",
     vectors: Object.freeze([...vectors]),
   });

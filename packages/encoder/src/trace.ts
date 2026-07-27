@@ -12,6 +12,7 @@ import {
   createFixedPatternMatrix,
   crc32c,
   encodeFrameBlocks,
+  encodeOriginalLengthPrefix,
   encodeUtf8Strict,
   getSymbolSize,
   interleaveCodewords,
@@ -71,7 +72,10 @@ function traceEncodedSymbol(
 ): EncoderTrace {
   const encodedPayload =
     symbol.compression === "rm-lz1"
-      ? rmlz1Encode(originalPayload)
+      ? withOriginalLengthPrefix(
+          originalPayload.length,
+          rmlz1Encode(originalPayload),
+        )
       : originalPayload.slice();
   const checksum = crc32c(originalPayload);
   const frame = new Uint8Array(encodedPayload.length + 4);
@@ -83,8 +87,8 @@ function traceEncodedSymbol(
   const rsBlocks = encodeFrameBlocks(frame, symbol.eccLevel);
   const interleavedCodewords = interleaveCodewords(rsBlocks, rsLayout);
   const scanOrder = buildScanOrder(size);
-  const headerCoordinates = scanOrder.slice(0, 96);
-  const bodyCoordinates = scanOrder.slice(96);
+  const headerCoordinates = scanOrder.slice(0, 64);
+  const bodyCoordinates = scanOrder.slice(64);
   const unmaskedBodyBits = createBodyBitstream(
     interleavedCodewords,
     bodyCoordinates.length,
@@ -97,13 +101,12 @@ function traceEncodedSymbol(
 
   for (const maskId of MASK_IDS) {
     const headerInput = {
-      sizeId: symbol.sizeId,
       eccLevel: symbol.eccLevel,
       payloadType: symbol.payloadType,
       compression: symbol.compression,
       maskId,
-      originalLength: symbol.originalLength,
       encodedLength: symbol.encodedLength,
+      integrityProfile: "crc32c",
     } as const;
     const headerInformation = buildHeaderInformation(headerInput);
     const protectedHeader = buildProtectedHeader(headerInput);
@@ -156,6 +159,17 @@ function traceEncodedSymbol(
     unmaskedBodyBits,
     masks: Object.freeze(masks),
   });
+}
+
+function withOriginalLengthPrefix(
+  originalLength: number,
+  compressed: Uint8Array,
+): Uint8Array {
+  const prefix = encodeOriginalLengthPrefix(originalLength);
+  const result = new Uint8Array(prefix.length + compressed.length);
+  result.set(prefix);
+  result.set(compressed, prefix.length);
+  return result;
 }
 
 function cloneMatrix(matrix: BooleanMatrix): boolean[][] {

@@ -3,13 +3,14 @@ import {
   COMPRESSION_MODE_VALUES,
   ECC_PROFILES,
   HEADER_INFORMATION_BYTES,
+  HEADER_MAGIC,
   HEADER_PARITY_BYTES,
   HEADER_TOTAL_BYTES,
   HEADER_WHITENING_BYTES,
+  INTEGRITY_PROFILE_VALUES,
+  MAX_ENCODED_DATA_LENGTH,
   PAYLOAD_TYPE_VALUES,
-  RS_PROFILE,
   SYMBOL_VERSION,
-  SYNC_BYTE,
 } from "./generated/spec-constants.js";
 import {
   reedSolomonDecode,
@@ -19,24 +20,27 @@ import {
 import type {
   CompressionMode,
   EccLevel,
+  IntegrityProfile,
   MaskId,
   PayloadType,
-  SizeId,
 } from "./types.js";
 
 export interface HeaderFields {
-  readonly version: 1;
-  readonly sizeId: SizeId;
+  readonly version: 2;
   readonly eccLevel: EccLevel;
   readonly payloadType: PayloadType;
   readonly compression: CompressionMode;
   readonly maskId: MaskId;
-  readonly originalLength: number;
   readonly encodedLength: number;
+  readonly integrityProfile: IntegrityProfile;
 }
 
-export interface HeaderInput extends Omit<HeaderFields, "version"> {
-  readonly version?: 1;
+export interface HeaderInput extends Omit<
+  HeaderFields,
+  "version" | "integrityProfile"
+> {
+  readonly version?: 2;
+  readonly integrityProfile?: IntegrityProfile;
 }
 
 export interface DecodedProtectedHeader {
@@ -51,30 +55,28 @@ export function buildHeaderInformation(input: HeaderInput): Uint8Array {
   validateHeaderInput(input);
   const version =
     (input as { readonly version?: number }).version ?? SYMBOL_VERSION;
-  const information = new Uint8Array(HEADER_INFORMATION_BYTES);
-  information[0] = SYNC_BYTE;
-  information[1] = (version << 4) | input.sizeId;
-  information[2] =
-    (ECC_PROFILES[input.eccLevel].bits << 6) |
-    (PAYLOAD_TYPE_VALUES[input.payloadType] << 4) |
-    (COMPRESSION_MODE_VALUES[input.compression] << 2) |
-    input.maskId;
-  information[3] = RS_PROFILE << 4;
-  information[4] = input.originalLength >>> 8;
-  information[5] = input.originalLength;
-  information[6] = input.encodedLength >>> 8;
-  information[7] = input.encodedLength;
-  return information;
+  const ecc = ECC_PROFILES[input.eccLevel].bits;
+  const payload = PAYLOAD_TYPE_VALUES[input.payloadType];
+  const codec = COMPRESSION_MODE_VALUES[input.compression];
+  const integrityProfile = input.integrityProfile ?? "crc32c";
+  const integrity = INTEGRITY_PROFILE_VALUES[integrityProfile];
+
+  return Uint8Array.of(
+    (HEADER_MAGIC << 4) | version,
+    (ecc << 6) | (payload << 5) | (codec << 2) | ((input.maskId >>> 1) & 0x03),
+    ((input.maskId & 0x01) << 7) | (input.encodedLength >>> 5),
+    ((input.encodedLength & 0x1f) << 3) | (integrity << 1),
+  );
 }
 
 export function buildProtectedHeader(input: HeaderInput): Uint8Array {
   return reedSolomonEncode(buildHeaderInformation(input), HEADER_PARITY_BYTES);
 }
 
-/** Applies the fixed v1 Header whitening mask. XOR makes this operation its own inverse. */
+/** Applies the fixed v2 Header whitening mask. XOR is its own inverse. */
 export function applyHeaderWhitening(header: Uint8Array): Uint8Array {
   if (header.length !== HEADER_TOTAL_BYTES) {
-    throw new RangeError("Header whitening requires exactly twelve bytes.");
+    throw new RangeError("Header whitening requires exactly eight bytes.");
   }
   return Uint8Array.from(
     header,
@@ -82,70 +84,58 @@ export function applyHeaderWhitening(header: Uint8Array): Uint8Array {
   );
 }
 
-export function parseHeaderInformation(
-  information: Uint8Array,
-  expectedSizeId?: SizeId,
-): HeaderFields {
+export function parseHeaderInformation(information: Uint8Array): HeaderFields {
   if (information.length !== HEADER_INFORMATION_BYTES) {
-    throw invalidHeader("Header information must contain exactly eight bytes.");
+    throw invalidHeader("Header information must contain exactly four bytes.");
   }
-  if (information[0] !== SYNC_BYTE) {
-    throw new RectaMatrixError(
-      "INVALID_HEADER",
-      "RectaMatrix Sync Byte is invalid.",
-    );
+  const magic = information[0]! >>> 4;
+  if (magic !== HEADER_MAGIC) {
+    throw invalidHeader("RectaMatrix Header Magic is invalid.");
   }
-  const version = information[1]! >>> 4;
+  const version = information[0]! & 0x0f;
   if (version !== SYMBOL_VERSION) {
     throw new RectaMatrixError(
       "UNSUPPORTED_VERSION",
       `Unsupported RectaMatrix version: ${String(version)}.`,
     );
   }
-  const rawSizeId = information[1]! & 0x0f;
-  if (rawSizeId > 6) {
-    throw new RectaMatrixError(
-      "UNSUPPORTED_SIZE",
-      `Unsupported RectaMatrix size ID: ${String(rawSizeId)}.`,
-    );
-  }
-  const sizeId = rawSizeId as SizeId;
-  if (expectedSizeId !== undefined && sizeId !== expectedSizeId) {
-    throw invalidHeader("Header Size ID does not match sampled geometry.");
-  }
 
-  const flags = information[2]!;
+  const flags = information[1]!;
   const eccLevel = decodeEccLevel(flags >>> 6);
-  const payloadType = decodePayloadType((flags >>> 4) & 0x03);
-  const compression = decodeCompression((flags >>> 2) & 0x03);
-  const maskId = (flags & 0x03) as MaskId;
-
-  if (information[3] !== RS_PROFILE << 4) {
-    throw invalidHeader("RS Profile or reserved Header bits are invalid.");
+  const payloadType = decodePayloadType((flags >>> 5) & 0x01);
+  const compression = decodeCompression((flags >>> 2) & 0x07);
+  const maskId = (((flags & 0x03) << 1) | (information[2]! >>> 7)) as MaskId;
+  if (maskId > 3) {
+    throw invalidHeader("Reserved Mask ID is unsupported.");
   }
-  const originalLength = (information[4]! << 8) | information[5]!;
-  const encodedLength = (information[6]! << 8) | information[7]!;
-  validateLengthRelationship(originalLength, encodedLength, compression);
+
+  const encodedLength =
+    ((information[2]! & 0x7f) << 5) | (information[3]! >>> 3);
+  if (encodedLength > MAX_ENCODED_DATA_LENGTH) {
+    throw invalidHeader("Extended Body framing is not defined for v2 Core.");
+  }
+  const integrityProfile = decodeIntegrity((information[3]! >>> 1) & 0x03);
+  if ((information[3]! & 0x01) !== 0) {
+    throw invalidHeader("Reserved Header bit must be zero.");
+  }
 
   return Object.freeze({
     version: SYMBOL_VERSION,
-    sizeId,
     eccLevel,
     payloadType,
     compression,
     maskId,
-    originalLength,
     encodedLength,
+    integrityProfile,
   });
 }
 
 export function decodeProtectedHeader(
   protectedHeader: Uint8Array,
   erasurePositions: readonly number[] = [],
-  expectedSizeId?: SizeId,
 ): DecodedProtectedHeader {
   if (protectedHeader.length !== HEADER_TOTAL_BYTES) {
-    throw invalidHeader("Protected Header must contain exactly twelve bytes.");
+    throw invalidHeader("Protected Header must contain exactly eight bytes.");
   }
   let decoded: ReedSolomonDecodeResult;
   try {
@@ -162,7 +152,7 @@ export function decodeProtectedHeader(
     );
   }
   return Object.freeze({
-    fields: parseHeaderInformation(decoded.data, expectedSizeId),
+    fields: parseHeaderInformation(decoded.data),
     correctedHeader: decoded.correctedCodeword,
     correctedCodewords: decoded.correctedCodewords,
     erasuresUsed: decoded.erasuresUsed,
@@ -174,10 +164,7 @@ function validateHeaderInput(input: HeaderInput): void {
   const version =
     (input as { readonly version?: number }).version ?? SYMBOL_VERSION;
   if (version !== SYMBOL_VERSION) {
-    throw new RangeError("Only RectaMatrix Version 1 can be encoded.");
-  }
-  if (!Number.isInteger(input.sizeId) || input.sizeId < 0 || input.sizeId > 6) {
-    throw new RangeError("Header Size ID must be between 0 and 6.");
+    throw new RangeError("Only RectaMatrix Version 2 can be encoded.");
   }
   if (!Object.hasOwn(ECC_PROFILES, input.eccLevel)) {
     throw new RangeError("Header ECC Level is unsupported.");
@@ -186,32 +173,23 @@ function validateHeaderInput(input: HeaderInput): void {
     throw new RangeError("Header Payload Type is unsupported.");
   }
   if (!Object.hasOwn(COMPRESSION_MODE_VALUES, input.compression)) {
-    throw new RangeError("Header Compression Mode is unsupported.");
+    throw new RangeError("Header Codec ID is unsupported.");
   }
   if (!Number.isInteger(input.maskId) || input.maskId < 0 || input.maskId > 3) {
     throw new RangeError("Header Mask ID must be between 0 and 3.");
   }
-  assertUint16(input.originalLength, "original Payload length");
-  assertUint16(input.encodedLength, "Encoded Payload length");
-  validateLengthRelationship(
-    input.originalLength,
-    input.encodedLength,
-    input.compression,
-  );
-}
-
-function validateLengthRelationship(
-  originalLength: number,
-  encodedLength: number,
-  compression: CompressionMode,
-): void {
-  if (compression === "none" && originalLength !== encodedLength) {
-    throw invalidHeader("Uncompressed Header lengths must be identical.");
-  }
-  if (compression === "rm-lz1" && encodedLength >= originalLength) {
-    throw invalidHeader(
-      "RM-LZ1 Encoded Payload must be shorter than the original Payload.",
+  if (
+    !Number.isInteger(input.encodedLength) ||
+    input.encodedLength < 0 ||
+    input.encodedLength > MAX_ENCODED_DATA_LENGTH
+  ) {
+    throw new RangeError(
+      `Encoded data length must be between 0 and ${String(MAX_ENCODED_DATA_LENGTH)}.`,
     );
+  }
+  const integrityProfile = input.integrityProfile ?? "crc32c";
+  if (!Object.hasOwn(INTEGRITY_PROFILE_VALUES, integrityProfile)) {
+    throw new RangeError("Header integrity profile is unsupported.");
   }
 }
 
@@ -223,12 +201,7 @@ function decodeEccLevel(bits: number): EccLevel {
 }
 
 function decodePayloadType(bits: number): PayloadType {
-  if (bits === 0) return "binary";
-  if (bits === 1) return "utf8";
-  throw new RectaMatrixError(
-    "UNSUPPORTED_PAYLOAD_TYPE",
-    "Reserved Payload Type is unsupported.",
-  );
+  return bits === 0 ? "binary" : "utf8";
 }
 
 function decodeCompression(bits: number): CompressionMode {
@@ -236,14 +209,16 @@ function decodeCompression(bits: number): CompressionMode {
   if (bits === 1) return "rm-lz1";
   throw new RectaMatrixError(
     "UNSUPPORTED_COMPRESSION",
-    "Reserved Compression Mode is unsupported.",
+    "Reserved Codec ID is unsupported.",
   );
 }
 
-function assertUint16(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
-    throw new RangeError(`${name} must be an unsigned 16-bit integer.`);
-  }
+function decodeIntegrity(bits: number): IntegrityProfile {
+  if (bits === 0) return "crc32c";
+  throw new RectaMatrixError(
+    "UNSUPPORTED_INTEGRITY_PROFILE",
+    "Reserved integrity profile is unsupported.",
+  );
 }
 
 function invalidHeader(message: string): RectaMatrixError {

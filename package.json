@@ -26,6 +26,7 @@
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:spec": "tsx scripts/generate-spec-constants.ts",
     "generate:vectors": "pnpm build && tsx scripts/generate-vectors.ts",
     "verify:vectors": "pnpm build && tsx scripts/verify-vectors.ts",
     "verify:spec": "tsx scripts/verify-spec-constants.ts",

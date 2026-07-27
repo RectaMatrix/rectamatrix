@@ -25,7 +25,7 @@ describe("RectaMatrix image detector", () => {
     const image = renderSymbol(symbol.matrix, 6, 4);
     const result = decodeImageData(image);
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok && result.type === "utf8") {
       expect(result.text).toBe(text);
       expect(result.vision.orientationDegrees).toBe(0);
@@ -265,7 +265,7 @@ describe("RectaMatrix image detector", () => {
     addGlare(scene, 178, 3, 0.85);
     const result = decodeImageData(scene);
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok && result.type === "utf8") {
       expect(result.text).toBe(text);
       expect(result.metadata.quality.crcValid).toBe(true);
@@ -318,7 +318,7 @@ describe("RectaMatrix image detector", () => {
     addGlare(scene, 177, 7, 0.72);
     const result = decodeImageData(scene);
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok && result.type === "utf8") {
       expect(result.text).toBe(text);
       expect(result.metadata.quality.crcValid).toBe(true);

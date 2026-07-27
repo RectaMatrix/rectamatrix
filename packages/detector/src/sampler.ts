@@ -94,7 +94,7 @@ export function sampleCandidate(
   );
 
   return Object.freeze({
-    profile: "rmx-cv-1",
+    profile: "rmx-v2-draft",
     sizeId,
     width: size.width,
     height: size.height,

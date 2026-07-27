@@ -68,7 +68,7 @@ export interface EncoderVector {
 export interface EncoderVectorSuite {
   readonly format: "rectamatrix-conformance";
   readonly vectorVersion: 1;
-  readonly coreVersion: 1;
+  readonly coreVersion: 2;
   readonly kind: "encoder";
   readonly vectors: readonly EncoderVector[];
 }
@@ -105,13 +105,13 @@ export interface DecoderNegativeVector {
 export interface DecoderNegativeVectorSuite {
   readonly format: "rectamatrix-conformance";
   readonly vectorVersion: 1;
-  readonly coreVersion: 1;
+  readonly coreVersion: 2;
   readonly kind: "decoder-negative";
   readonly vectors: readonly DecoderNegativeVector[];
 }
 
 export interface DecoderPositiveQualityExpected {
-  readonly profile: "rmx-cv-1";
+  readonly profile: "rmx-v2-draft";
   readonly overallConfidence: number;
   readonly averageModuleConfidence: number;
   readonly minimumModuleConfidence: number;
@@ -132,7 +132,7 @@ export interface DecoderPositiveQualityExpected {
 }
 
 export interface DecoderPositiveMetadataExpected {
-  readonly version: 1;
+  readonly version: 2;
   readonly sizeId: SizeId;
   readonly width: number;
   readonly height: number;
@@ -174,7 +174,7 @@ export interface DecoderPositiveVector {
 export interface DecoderPositiveVectorSuite {
   readonly format: "rectamatrix-conformance";
   readonly vectorVersion: 1;
-  readonly coreVersion: 1;
+  readonly coreVersion: 2;
   readonly kind: "decoder-positive";
   readonly vectors: readonly DecoderPositiveVector[];
 }
@@ -232,7 +232,7 @@ export interface ImageVector {
 export interface ImageVectorSuite {
   readonly format: "rectamatrix-conformance";
   readonly vectorVersion: 1;
-  readonly coreVersion: 1;
+  readonly coreVersion: 2;
   readonly kind: "image";
   readonly vectors: readonly ImageVector[];
 }

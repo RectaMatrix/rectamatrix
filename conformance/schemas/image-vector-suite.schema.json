@@ -8,7 +8,7 @@
   "properties": {
     "format": { "const": "rectamatrix-conformance" },
     "vectorVersion": { "const": 1 },
-    "coreVersion": { "const": 1 },
+    "coreVersion": { "const": 2 },
     "kind": { "const": "image" },
     "vectors": {
       "type": "array",
@@ -112,7 +112,7 @@
           "type": "string",
           "pattern": "^(?:[0-9a-f]{2})*$"
         },
-        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 29 },
         "orientationDegrees": { "enum": [0, 90, 180, 270] },
         "minimumOverallConfidence": {
           "type": "number",

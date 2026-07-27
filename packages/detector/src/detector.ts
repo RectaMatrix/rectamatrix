@@ -85,124 +85,132 @@ export function decodeImageData(
       options.sourceQuadrilateral === undefined
         ? detectTightQuietZoneCandidates(grayscale)
         : [];
-    const quadrilaterals =
-      options.sourceQuadrilateral === undefined
-        ? tightCandidates.length > 0
-          ? tightCandidates
-          : detectSceneCandidates(grayscale, options)
-        : [
-            Object.freeze({
-              quadrilateral: copyQuadrilateral(options.sourceQuadrilateral),
-              sizeIds: RECTAMATRIX_SIZES.map(({ sizeId }) => sizeId),
-            }),
-          ];
     if (options.sourceQuadrilateral !== undefined) {
       validateQuadrilateral(options.sourceQuadrilateral, image);
     }
+    const candidateGroups: readonly (
+      readonly LocatedCandidate[] | undefined
+    )[] =
+      options.sourceQuadrilateral === undefined
+        ? tightCandidates.length > 0
+          ? [tightCandidates, undefined]
+          : [undefined]
+        : [
+            [
+              Object.freeze({
+                quadrilateral: copyQuadrilateral(options.sourceQuadrilateral),
+                sizeIds: RECTAMATRIX_SIZES.map(({ sizeId }) => sizeId),
+              }),
+            ],
+          ];
     let refinementAttempts = 0;
-    for (const located of quadrilaterals) {
-      const refinementSeeds: {
-        readonly sample: VisionSample;
-        readonly sizeId: SizeId;
-        readonly orientationDegrees: OrientationDegrees;
-        readonly rank: number;
-      }[] = [];
-      for (const sizeId of located.sizeIds) {
-        const size = RECTAMATRIX_SIZES[sizeId];
-        for (const orientationDegrees of ORIENTATIONS) {
-          if (
-            !isPlausibleAssignment(
-              located.quadrilateral,
-              size.width,
-              size.height,
-              orientationDegrees,
-              minimumModulePixels,
-            )
-          ) {
-            continue;
-          }
-          let sample: VisionSample;
-          try {
-            sample = sampleCandidate(
-              grayscale,
-              located.quadrilateral,
-              size.sizeId,
-              orientationDegrees,
-              {
-                samplesPerModule,
-                allowInverted: options.tryInverted ?? false,
-              },
-            );
-          } catch {
-            continue;
-          }
-          const passesFixedPatterns =
-            sample.scores.anchor >= 0.8 &&
-            sample.scores.anchorCutout >= 0.8 &&
-            sample.scores.topClock >= 0.75 &&
-            sample.scores.leftClock >= 0.75 &&
-            (sample.scores.topClock + sample.scores.leftClock) / 2 >= 0.82;
-          if (passesFixedPatterns) {
-            const decoded = decodeSampledSymbol({
-              modules: sample.modules,
-              confidence: sample.confidence,
-              detectorMetadata: {
-                imageQuality: sample.imageQuality,
-                blurEstimate: sample.blurEstimate,
-                perspectiveEstimateDegrees: sample.perspectiveEstimateDegrees,
-              },
-            });
-            if (decoded.ok) {
-              return imageSuccess(decoded, sample, samplesPerModule);
+    for (const candidateGroup of candidateGroups) {
+      const quadrilaterals =
+        candidateGroup ?? detectSceneCandidates(grayscale, options);
+      for (const located of quadrilaterals) {
+        const refinementSeeds: {
+          readonly sample: VisionSample;
+          readonly sizeId: SizeId;
+          readonly orientationDegrees: OrientationDegrees;
+          readonly rank: number;
+        }[] = [];
+        for (const sizeId of located.sizeIds) {
+          const size = RECTAMATRIX_SIZES[sizeId];
+          for (const orientationDegrees of ORIENTATIONS) {
+            if (
+              !isPlausibleAssignment(
+                located.quadrilateral,
+                size.width,
+                size.height,
+                orientationDegrees,
+                minimumModulePixels,
+              )
+            ) {
+              continue;
+            }
+            let sample: VisionSample;
+            try {
+              sample = sampleCandidate(
+                grayscale,
+                located.quadrilateral,
+                size.sizeId,
+                orientationDegrees,
+                {
+                  samplesPerModule,
+                  allowInverted: options.tryInverted ?? false,
+                },
+              );
+            } catch {
+              continue;
+            }
+            const passesFixedPatterns =
+              sample.scores.anchor >= 0.8 &&
+              sample.scores.anchorCutout >= 0.8 &&
+              sample.scores.topClock >= 0.75 &&
+              sample.scores.leftClock >= 0.75 &&
+              (sample.scores.topClock + sample.scores.leftClock) / 2 >= 0.82;
+            if (passesFixedPatterns) {
+              const decoded = decodeSampledSymbol({
+                modules: sample.modules,
+                confidence: sample.confidence,
+                detectorMetadata: {
+                  imageQuality: sample.imageQuality,
+                  blurEstimate: sample.blurEstimate,
+                  perspectiveEstimateDegrees: sample.perspectiveEstimateDegrees,
+                },
+              });
+              if (decoded.ok) {
+                return imageSuccess(decoded, sample, samplesPerModule);
+              }
+            }
+
+            const refinementRank =
+              sample.scores.anchor * 0.4 +
+              sample.scores.anchorCutout * 0.2 +
+              sample.scores.combined * 0.4;
+            if (
+              sample.scores.anchor >= 0.82 &&
+              sample.scores.anchorCutout >= 0.8 &&
+              sample.scores.combined >= 0.68 &&
+              !refinementSeeds.some(
+                (seed) =>
+                  seed.sizeId === size.sizeId &&
+                  seed.orientationDegrees === orientationDegrees,
+              )
+            ) {
+              refinementSeeds.push({
+                sample,
+                sizeId: size.sizeId,
+                orientationDegrees,
+                rank: refinementRank,
+              });
             }
           }
-
-          const refinementRank =
-            sample.scores.anchor * 0.4 +
-            sample.scores.anchorCutout * 0.2 +
-            sample.scores.combined * 0.4;
-          if (
-            sample.scores.anchor >= 0.82 &&
-            sample.scores.anchorCutout >= 0.8 &&
-            sample.scores.combined >= 0.68 &&
-            !refinementSeeds.some(
-              (seed) =>
-                seed.sizeId === size.sizeId &&
-                seed.orientationDegrees === orientationDegrees,
-            )
-          ) {
-            refinementSeeds.push({
-              sample,
-              sizeId: size.sizeId,
-              orientationDegrees,
-              rank: refinementRank,
-            });
-          }
         }
-      }
-      if (
-        options.sourceQuadrilateral === undefined &&
-        refinementSeeds.length > 0 &&
-        refinementAttempts < 8
-      ) {
-        refinementSeeds.sort((left, right) => right.rank - left.rank);
-        for (const refinementSeed of refinementSeeds) {
-          if (refinementAttempts >= 8) break;
-          refinementAttempts += 1;
-          const refined = refineAndDecodeCandidate(
-            grayscale,
-            located.quadrilateral,
-            refinementSeed.sizeId,
-            refinementSeed.orientationDegrees,
-            samplesPerModule,
-            options.tryInverted ?? false,
-          );
-          if (refined !== undefined) {
-            return imageSuccess(
-              refined.decoded,
-              refined.sample,
-              refined.samplesPerModule,
+        if (
+          options.sourceQuadrilateral === undefined &&
+          refinementSeeds.length > 0 &&
+          refinementAttempts < 8
+        ) {
+          refinementSeeds.sort((left, right) => right.rank - left.rank);
+          for (const refinementSeed of refinementSeeds) {
+            if (refinementAttempts >= 8) break;
+            refinementAttempts += 1;
+            const refined = refineAndDecodeCandidate(
+              grayscale,
+              located.quadrilateral,
+              refinementSeed.sizeId,
+              refinementSeed.orientationDegrees,
+              samplesPerModule,
+              options.tryInverted ?? false,
             );
+            if (refined !== undefined) {
+              return imageSuccess(
+                refined.decoded,
+                refined.sample,
+                refined.samplesPerModule,
+              );
+            }
           }
         }
       }

@@ -24,15 +24,20 @@ if (
   HEADER_WHITENING_BYTES.reduce(
     (count, byte) => count + byte.toString(2).replaceAll("0", "").length,
     0,
-  ) !== 48
+  ) !== 32
 ) {
-  throw new Error("Header whitening must contain exactly 48 one-bits.");
+  throw new Error("Header whitening must contain exactly 32 one-bits.");
 }
 
 for (const size of RECTAMATRIX_SIZES) {
   const expected = CALCULATED_CAPACITIES[size.sizeId];
-  if (size.width * 2 !== size.height * 3) {
-    throw new Error(`Size ${String(size.sizeId)} is not exactly 3:2.`);
+  const ratio = size.width / size.height;
+  const expectedRatio =
+    size.aspectRatio === "3:2" ? 1.5 : size.aspectRatio === "2:1" ? 2 : 3;
+  if (ratio !== expectedRatio) {
+    throw new Error(
+      `Size ${String(size.sizeId)} does not match ${size.aspectRatio}.`,
+    );
   }
   if (size.anchorSize !== size.height / 4) {
     throw new Error(`Size ${String(size.sizeId)} has the wrong anchor size.`);
@@ -75,7 +80,7 @@ for (const size of RECTAMATRIX_SIZES) {
   }
 }
 
-console.log("RectaMatrix v1 specification constants verified.");
+console.log("RectaMatrix v2 draft specification constants verified.");
 
 function assertNextFrameDoesNotFit(
   maximumFrame: number,

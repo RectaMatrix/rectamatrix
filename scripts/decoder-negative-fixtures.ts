@@ -127,17 +127,17 @@ add(
   "header-unsupported-version",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[1] = 0x20 | binaryTrace.symbol.sizeId;
+      information[0] = (information[0]! & 0xf0) | 0x03;
     }),
   ),
   ["UNSUPPORTED_VERSION"],
 );
 
 add(
-  "header-size-mismatch",
+  "header-invalid-magic",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[1] = 0x11;
+      information[0] = 0x02;
     }),
   ),
   ["INVALID_HEADER"],
@@ -147,27 +147,27 @@ add(
   "header-reserved-ecc",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[2] = (information[2]! & 0x3f) | 0xc0;
+      information[1] = (information[1]! & 0x3f) | 0xc0;
     }),
   ),
   ["INVALID_HEADER"],
 );
 
 add(
-  "header-unsupported-payload-type",
+  "header-unsupported-integrity-profile",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[2] = (information[2]! & 0xcf) | 0x20;
+      information[3] = (information[3]! & 0xf9) | 0x06;
     }),
   ),
-  ["UNSUPPORTED_PAYLOAD_TYPE"],
+  ["UNSUPPORTED_INTEGRITY_PROFILE"],
 );
 
 add(
   "header-unsupported-compression",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[2] = (information[2]! & 0xf3) | 0x08;
+      information[1] = (information[1]! & 0xe3) | 0x08;
     }),
   ),
   ["UNSUPPORTED_COMPRESSION"],
@@ -177,10 +177,8 @@ add(
   "header-body-truncated",
   matrixToRows(
     replaceHeader(binaryTrace, (information) => {
-      information[4] = 0;
-      information[5] = 100;
-      information[6] = 0;
-      information[7] = 100;
+      information[2] = (information[2]! & 0x80) | (100 >>> 5);
+      information[3] = (100 & 0x1f) << 3;
     }),
   ),
   ["BODY_TRUNCATED"],

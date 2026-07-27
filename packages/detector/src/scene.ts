@@ -15,6 +15,12 @@ const SYMBOL_ASPECT_RATIO = 1.5;
 const MINIMUM_SYMBOL_SHORT_SIDE_MODULES = 16;
 const DEFAULT_MINIMUM_MODULE_PIXELS = 3;
 const DEFAULT_MAXIMUM_CANDIDATES = 48;
+// The v2 matrix core already supports all geometry families. Automatic scene
+// discovery remains on the 3:2 family until the v2 multi-corner locator lands;
+// explicit quadrilaterals can still sample every geometry.
+const SCENE_SEARCH_SIZES = RECTAMATRIX_SIZES.filter(
+  ({ aspectRatio }) => aspectRatio === "3:2",
+);
 
 export interface SceneSearchOptions {
   readonly minimumModulePixels?: number;
@@ -108,7 +114,7 @@ export function detectSceneCandidates(
 
   ranked.sort((left, right) => left.rank - right.rank);
   const allSizeIds = Object.freeze(
-    RECTAMATRIX_SIZES.map(({ sizeId }) => sizeId),
+    SCENE_SEARCH_SIZES.map(({ sizeId }) => sizeId),
   );
   const unique = new Map<string, SceneCandidate>();
   for (const { quadrilateral, sizeIds = allSizeIds } of ranked) {
@@ -221,7 +227,7 @@ function locateAnchorPatternHypotheses(
       readonly size: SymbolSize;
       readonly score: number;
     }[] = [];
-    for (const size of RECTAMATRIX_SIZES) {
+    for (const size of SCENE_SEARCH_SIZES) {
       let best:
         | {
             readonly quadrilateral: SourceQuadrilateral;
@@ -311,7 +317,7 @@ function rankRegionHypotheses(
     let fixedScore = 0;
     const sizeScores: { readonly sizeId: SizeId; readonly score: number }[] =
       [];
-    for (const size of RECTAMATRIX_SIZES) {
+    for (const size of SCENE_SEARCH_SIZES) {
       let sizeScore = 0;
       for (const orientation of [0, 90, 180, 270] as const) {
         sizeScore = Math.max(
@@ -783,7 +789,7 @@ function locateFixedPatternHypotheses(
   let probes = 0;
   const hypotheses: RankedQuadrilateral[] = [];
 
-  outer: for (const size of RECTAMATRIX_SIZES) {
+  outer: for (const size of SCENE_SEARCH_SIZES) {
     for (const orientation of [0, 90, 180, 270] as const) {
       const rotated = orientation === 90 || orientation === 270;
       const moduleWidth = rotated ? size.height : size.width;

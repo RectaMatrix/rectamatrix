@@ -59,7 +59,7 @@ describe("positive decoder conformance vectors", () => {
     const malformed: unknown = {
       format: "rectamatrix-conformance",
       vectorVersion: 1,
-      coreVersion: 1,
+      coreVersion: 2,
       kind: "decoder-positive",
       vectors: [
         {

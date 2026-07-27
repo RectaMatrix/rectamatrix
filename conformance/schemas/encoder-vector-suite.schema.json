@@ -8,7 +8,7 @@
   "properties": {
     "format": { "const": "rectamatrix-conformance" },
     "vectorVersion": { "const": 1 },
-    "coreVersion": { "const": 1 },
+    "coreVersion": { "const": 2 },
     "kind": { "const": "encoder" },
     "vectors": {
       "type": "array",
@@ -55,7 +55,7 @@
       "properties": {
         "eccLevel": { "enum": ["low", "medium", "high"] },
         "compression": { "enum": ["none", "rm-lz1", "auto"] },
-        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 }
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 29 }
       }
     },
     "rsBlock": {
@@ -108,9 +108,14 @@
         "finalMatrix"
       ],
       "properties": {
-        "sizeId": { "type": "integer", "minimum": 0, "maximum": 4 },
-        "width": { "enum": [24, 36, 48, 72, 96] },
-        "height": { "enum": [16, 24, 32, 48, 64] },
+        "sizeId": { "type": "integer", "minimum": 0, "maximum": 29 },
+        "width": {
+          "enum": [
+            24, 30, 32, 36, 40, 42, 48, 56, 60, 64, 72, 80, 84, 96, 120, 128,
+            144, 160, 192, 240, 288
+          ]
+        },
+        "height": { "enum": [16, 20, 24, 28, 32, 40, 48, 64, 80, 96] },
         "payloadType": { "enum": ["binary", "utf8"] },
         "compression": { "enum": ["none", "rm-lz1"] },
         "eccLevel": { "enum": ["low", "medium", "high"] },
@@ -123,7 +128,7 @@
         "encodedLength": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 65535
+          "maximum": 4094
         },
         "originalPayloadHex": { "$ref": "#/$defs/hex" },
         "encodedPayloadHex": { "$ref": "#/$defs/hex" },
@@ -134,11 +139,11 @@
         "frameHex": { "$ref": "#/$defs/hex" },
         "headerInformationHex": {
           "type": "string",
-          "pattern": "^[0-9a-f]{16}$"
+          "pattern": "^[0-9a-f]{8}$"
         },
         "protectedHeaderHex": {
           "type": "string",
-          "pattern": "^[0-9a-f]{24}$"
+          "pattern": "^[0-9a-f]{16}$"
         },
         "rsBlockCount": { "type": "integer", "minimum": 1 },
         "rsTotalDataBytes": { "type": "integer", "minimum": 4 },

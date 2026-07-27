@@ -18,7 +18,7 @@ export interface SampledSymbolInput extends SampledSymbol {
 }
 
 export interface DecodeQualityReport {
-  readonly profile: "rmx-cv-1";
+  readonly profile: "rmx-v2-draft";
   readonly overallConfidence: number;
   readonly averageModuleConfidence: number;
   readonly minimumModuleConfidence: number;
@@ -39,7 +39,7 @@ export interface DecodeQualityReport {
 }
 
 export interface DecodeMetadata {
-  readonly version: 1;
+  readonly version: 2;
   readonly sizeId: SizeId;
   readonly width: number;
   readonly height: number;

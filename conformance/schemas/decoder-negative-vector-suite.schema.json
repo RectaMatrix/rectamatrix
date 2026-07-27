@@ -8,7 +8,7 @@
   "properties": {
     "format": { "const": "rectamatrix-conformance" },
     "vectorVersion": { "const": 1 },
-    "coreVersion": { "const": 1 },
+    "coreVersion": { "const": 2 },
     "kind": { "const": "decoder-negative" },
     "vectors": {
       "type": "array",

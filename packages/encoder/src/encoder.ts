@@ -13,6 +13,7 @@ import {
   createFixedPatternMatrix,
   crc32c,
   encodeFrameBlocks,
+  encodeOriginalLengthPrefix,
   encodeUtf8Strict,
   getSymbolSize,
   interleaveCodewords,
@@ -81,21 +82,20 @@ function encodePayload(
   const blocks = encodeFrameBlocks(prepared.frame, configuration.eccLevel);
   const interleaved = interleaveCodewords(blocks, layout);
   const scanOrder = buildScanOrder(size);
-  const headerCoordinates = scanOrder.slice(0, 96);
-  const bodyCoordinates = scanOrder.slice(96);
+  const headerCoordinates = scanOrder.slice(0, 64);
+  const bodyCoordinates = scanOrder.slice(64);
   const bodyBits = createBodyBitstream(interleaved, bodyCoordinates.length);
   const candidates: MaskCandidate[] = [];
 
   for (const maskId of MASK_IDS) {
     const matrix = cloneMatrix(createFixedPatternMatrix(size));
     const protectedHeader = buildProtectedHeader({
-      sizeId: size.sizeId,
       eccLevel: configuration.eccLevel,
       payloadType,
       compression: prepared.compression,
       maskId,
-      originalLength: prepared.original.length,
       encodedLength: prepared.encoded.length,
+      integrityProfile: "crc32c",
     });
     writeBits(
       matrix,
@@ -117,7 +117,7 @@ function encodePayload(
 
   const selected = selectBestMask(candidates);
   return Object.freeze({
-    version: 1,
+    version: 2,
     sizeId: size.sizeId,
     width: size.width,
     height: size.height,
@@ -140,10 +140,16 @@ function preparePayload(
 
   if (mode !== "none") {
     const compressed = rmlz1Encode(original);
+    const originalLengthPrefix = encodeOriginalLengthPrefix(original.length);
+    const compressedStream = new Uint8Array(
+      originalLengthPrefix.length + compressed.length,
+    );
+    compressedStream.set(originalLengthPrefix);
+    compressedStream.set(compressed, originalLengthPrefix.length);
     const useCompressed =
       mode === "rm-lz1"
-        ? compressed.length < original.length
-        : compressed.length + 2 <= original.length;
+        ? compressedStream.length < original.length
+        : compressedStream.length + 2 <= original.length;
     if (mode === "rm-lz1" && !useCompressed) {
       throw new RectaMatrixError(
         "COMPRESSION_NOT_BENEFICIAL",
@@ -151,7 +157,7 @@ function preparePayload(
       );
     }
     if (useCompressed) {
-      encoded = compressed;
+      encoded = compressedStream;
       compression = "rm-lz1";
     }
   }
@@ -177,7 +183,7 @@ function selectSize(
 } {
   const sizes =
     requestedSizeId === undefined
-      ? RECTAMATRIX_SIZES
+      ? [...RECTAMATRIX_SIZES].sort(compareAutomaticSizeOrder)
       : [getSymbolSize(requestedSizeId)];
 
   for (const size of sizes) {
@@ -189,7 +195,7 @@ function selectSize(
   throw new RectaMatrixError(
     "PAYLOAD_TOO_LARGE",
     requestedSizeId === undefined
-      ? "Payload exceeds every RectaMatrix Version 1 symbol size."
+      ? "Payload exceeds every RectaMatrix Version 2 symbol size."
       : `Payload exceeds requested RectaMatrix size ${String(requestedSizeId)}.`,
   );
 }
@@ -213,13 +219,30 @@ function validateOptions(options?: EncodeOptions): EncodingConfiguration {
   const sizeId = options?.sizeId;
   if (
     sizeId !== undefined &&
-    (!Number.isInteger(sizeId) || sizeId < 0 || sizeId > 6)
+    (!Number.isInteger(sizeId) ||
+      sizeId < 0 ||
+      sizeId >= RECTAMATRIX_SIZES.length)
   ) {
-    throw new RangeError("RectaMatrix Size ID must be between 0 and 6.");
+    throw new RangeError(
+      `RectaMatrix Size ID must be between 0 and ${String(RECTAMATRIX_SIZES.length - 1)}.`,
+    );
   }
   return sizeId === undefined
     ? Object.freeze({ eccLevel, compression })
     : Object.freeze({ eccLevel, compression, sizeId });
+}
+
+function compareAutomaticSizeOrder(
+  left: SymbolSize,
+  right: SymbolSize,
+): number {
+  const areaDifference = left.width * left.height - right.width * right.height;
+  if (areaDifference !== 0) return areaDifference;
+  const familyRank = { "3:2": 0, "2:1": 1, "3:1": 2 } as const;
+  return (
+    familyRank[left.aspectRatio] - familyRank[right.aspectRatio] ||
+    left.sizeId - right.sizeId
+  );
 }
 
 function cloneMatrix(matrix: BooleanMatrix): boolean[][] {

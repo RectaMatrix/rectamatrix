@@ -13,7 +13,7 @@ import {
   maximumCodewordBytes,
 } from "../src/geometry.js";
 
-describe("RectaMatrix Version 1 geometry", () => {
+describe("RectaMatrix Version 2 transitional geometry", () => {
   it("matches all calculated capacities", () => {
     for (const size of RECTAMATRIX_SIZES) {
       const expected = CALCULATED_CAPACITIES[size.sizeId];

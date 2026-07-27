@@ -18,16 +18,15 @@ describe("encoder conformance trace", () => {
     expect(trace.frame.slice(0, -4)).toEqual(trace.encodedPayload);
     expect(trace.headerInformation).toEqual(
       buildHeaderInformation({
-        sizeId: symbol.sizeId,
         eccLevel: symbol.eccLevel,
         payloadType: symbol.payloadType,
         compression: symbol.compression,
         maskId: symbol.maskId,
-        originalLength: symbol.originalLength,
         encodedLength: symbol.encodedLength,
+        integrityProfile: "crc32c",
       }),
     );
-    expect(trace.protectedHeader).toHaveLength(12);
+    expect(trace.protectedHeader).toHaveLength(8);
     expect(trace.rsBlocks).toHaveLength(trace.rsLayout.blockCount);
     expect(trace.interleavedCodewords).toHaveLength(
       trace.rsLayout.totalCodewordBytes,

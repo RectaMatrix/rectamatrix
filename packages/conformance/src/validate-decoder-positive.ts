@@ -18,7 +18,7 @@ export function validateDecoderPositiveVectorSuite(
   );
   literal(suite.format, "rectamatrix-conformance", "suite.format");
   literal(suite.vectorVersion, 1, "suite.vectorVersion");
-  literal(suite.coreVersion, 1, "suite.coreVersion");
+  literal(suite.coreVersion, 2, "suite.coreVersion");
   literal(suite.kind, "decoder-positive", "suite.kind");
   if (!Array.isArray(suite.vectors) || suite.vectors.length === 0) {
     fail("suite.vectors must be a non-empty array.");
@@ -73,8 +73,8 @@ function validateMetadata(value: unknown, path: string): void {
     ],
     path,
   );
-  literal(metadata.version, 1, `${path}.version`);
-  integer(metadata.sizeId, 0, 6, `${path}.sizeId`);
+  literal(metadata.version, 2, `${path}.version`);
+  integer(metadata.sizeId, 0, RECTAMATRIX_SIZES.length - 1, `${path}.sizeId`);
   const size = RECTAMATRIX_SIZES[metadata.sizeId as SizeId];
   integer(metadata.width, size.width, size.width, `${path}.width`);
   integer(metadata.height, size.height, size.height, `${path}.height`);
@@ -111,7 +111,7 @@ function validateQuality(value: unknown, path: string): void {
     if (quality[key] !== undefined) required.push(key);
   }
   exactKeys(quality, required, path);
-  literal(quality.profile, "rmx-cv-1", `${path}.profile`);
+  literal(quality.profile, "rmx-v2-draft", `${path}.profile`);
   for (const key of [
     "overallConfidence",
     "averageModuleConfidence",

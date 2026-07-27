@@ -9,6 +9,7 @@ import {
   bytesToUint32BE,
   calculateRsLayout,
   crc32c,
+  decodeOriginalLengthPrefix,
   decodeProtectedHeader,
   decodeUtf8Strict,
   deinterleaveCodewords,
@@ -142,7 +143,7 @@ export function decodeSampledSymbol(symbol: SampledSymbolInput): DecodeResult {
     const scan = buildScanOrder(sample.size);
     const headerCoordinates = scan.slice(0, HEADER_BITS);
     const bodyCoordinates = scan.slice(HEADER_BITS);
-    const headerRead = readBytesWithConfidence(sample, headerCoordinates, 12);
+    const headerRead = readBytesWithConfidence(sample, headerCoordinates, 8);
     let attempts = 0;
     let decodedHeaderCandidate = false;
     let lastFailure = new DecoderFailure(
@@ -166,7 +167,6 @@ export function decodeSampledSymbol(symbol: SampledSymbolInput): DecodeResult {
         const decoded = decodeProtectedHeader(
           applyHeaderWhitening(headerRead.bytes),
           headerErasures,
-          sample.size.sizeId,
         );
         const correctedKey = Array.from(decoded.correctedHeader).join(",");
         if (correctedHeaders.has(correctedKey)) continue;
@@ -518,19 +518,17 @@ function decodeBody(
     originalPayload = encodedPayload;
   } else {
     try {
-      originalPayload = rmlz1Decode(encodedPayload, header.originalLength);
+      const lengthPrefix = decodeOriginalLengthPrefix(encodedPayload);
+      originalPayload = rmlz1Decode(
+        encodedPayload.slice(lengthPrefix.bytesRead),
+        lengthPrefix.value,
+      );
     } catch {
       throw new DecoderFailure(
         "DECOMPRESSION_FAILURE",
         "RM-LZ1 Payload decompression failed.",
       );
     }
-  }
-  if (originalPayload.length !== header.originalLength) {
-    throw new DecoderFailure(
-      "LENGTH_MISMATCH",
-      "Original Payload length does not match the Header.",
-    );
   }
   if (crc32c(originalPayload) !== storedCrc) {
     throw new DecoderFailure("CRC_FAILURE", "Payload CRC-32C does not match.");
@@ -568,7 +566,7 @@ function buildSuccess(
 ): DecodeResult {
   const totalProtectedCodewords =
     calculateRsLayout(header.fields.encodedLength + 4, header.fields.eccLevel)
-      .totalCodewordBytes + 12;
+      .totalCodewordBytes + 8;
   const correctionConfidence = clamp01(
     1 -
       (body.correctedCodewords +
@@ -594,7 +592,7 @@ function buildSuccess(
             imageQuality * 0.2,
         );
   const quality: DecodeQualityReport = Object.freeze({
-    profile: "rmx-cv-1",
+    profile: "rmx-v2-draft",
     overallConfidence,
     averageModuleConfidence: sample.averageConfidence,
     minimumModuleConfidence: sample.minimumConfidence,
@@ -621,8 +619,8 @@ function buildSuccess(
         }),
   });
   const metadata: DecodeMetadata = Object.freeze({
-    version: 1,
-    sizeId: header.fields.sizeId,
+    version: 2,
+    sizeId: sample.size.sizeId,
     width: sample.size.width,
     height: sample.size.height,
     eccLevel: header.fields.eccLevel,

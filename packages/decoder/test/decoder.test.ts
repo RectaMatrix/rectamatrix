@@ -209,13 +209,12 @@ describe("sampled RectaMatrix decoding", () => {
     const modules = mutableMatrix(encoded.matrix);
     const scan = buildScanOrder(getSymbolSize(encoded.sizeId));
     const header = buildProtectedHeader({
-      sizeId: encoded.sizeId,
       eccLevel: encoded.eccLevel,
       payloadType: "utf8",
       compression: encoded.compression,
       maskId: encoded.maskId,
-      originalLength: encoded.originalLength,
       encodedLength: encoded.encodedLength,
+      integrityProfile: "crc32c",
     });
     writeBits(
       modules,
@@ -237,7 +236,6 @@ describe("sampled RectaMatrix decoding", () => {
     rewriteHeader(modules, encoded, {
       payloadType: "binary",
       compression: "rm-lz1",
-      originalLength: 5,
       encodedLength: 2,
     });
     expect(decodeSampledSymbol({ modules })).toMatchObject({
@@ -297,18 +295,16 @@ function rewriteHeader(
   fields: {
     readonly payloadType: "binary" | "utf8";
     readonly compression: "none" | "rm-lz1";
-    readonly originalLength: number;
     readonly encodedLength: number;
   },
 ): void {
   const header = buildProtectedHeader({
-    sizeId: symbol.sizeId,
     eccLevel: symbol.eccLevel,
     payloadType: fields.payloadType,
     compression: fields.compression,
     maskId: symbol.maskId,
-    originalLength: fields.originalLength,
     encodedLength: fields.encodedLength,
+    integrityProfile: "crc32c",
   });
   const scan = buildScanOrder(getSymbolSize(symbol.sizeId));
   writeBits(

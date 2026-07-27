@@ -14,7 +14,7 @@ export function validateImageVectorSuite(
   );
   literal(suite.format, "rectamatrix-conformance", "suite.format");
   literal(suite.vectorVersion, 1, "suite.vectorVersion");
-  literal(suite.coreVersion, 1, "suite.coreVersion");
+  literal(suite.coreVersion, 2, "suite.coreVersion");
   literal(suite.kind, "image", "suite.kind");
   if (!Array.isArray(suite.vectors) || suite.vectors.length === 0) {
     fail("suite.vectors must be a non-empty array.");
@@ -161,7 +161,7 @@ function validateExpected(value: unknown, path: string): void {
   if (!isLowercaseHex(expected.payloadHex)) {
     fail(`${path}.payloadHex must contain lowercase hexadecimal byte pairs.`);
   }
-  integer(expected.sizeId, 0, 6, `${path}.sizeId`);
+  integer(expected.sizeId, 0, RECTAMATRIX_SIZES.length - 1, `${path}.sizeId`);
   const size = RECTAMATRIX_SIZES[expected.sizeId as SizeId];
   enumeration(
     expected.orientationDegrees,

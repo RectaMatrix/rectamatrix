@@ -31,7 +31,7 @@ describe("negative decoder conformance vectors", () => {
     const malformed: unknown = {
       format: "rectamatrix-conformance",
       vectorVersion: 1,
-      coreVersion: 1,
+      coreVersion: 2,
       kind: "decoder-negative",
       vectors: [
         {
@@ -50,7 +50,7 @@ describe("negative decoder conformance vectors", () => {
     const wrongCode: DecoderNegativeVectorSuite = {
       format: "rectamatrix-conformance",
       vectorVersion: 1,
-      coreVersion: 1,
+      coreVersion: 2,
       kind: "decoder-negative",
       vectors: [
         {

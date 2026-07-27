@@ -148,14 +148,14 @@ addSuccess(
   textExpectation(motionText, 0, 0, 0.65),
 );
 
-const overlappingFirstText = "Upper";
-const overlappingFirst = encodeText(overlappingFirstText, {
-  sizeId: 1,
+const overlappingFirst = encodeText("Upper", {
+  sizeId: 2,
   eccLevel: "high",
   compression: "none",
 });
-const overlappingSecond = encodeText("Lower", {
-  sizeId: 1,
+const overlappingSecondText = "Lower";
+const overlappingSecond = encodeText(overlappingSecondText, {
+  sizeId: 2,
   eccLevel: "high",
   compression: "none",
 });
@@ -167,12 +167,12 @@ addSuccess(
   ["scene", "multiple-candidates", "overlapping-projections"],
   overlappingScene,
   { maximumCandidates: 64 },
-  textExpectation(overlappingFirstText, 1, 0, 0.8),
+  textExpectation(overlappingSecondText, 2, 0, 0.8),
 );
 
 const reflectionText = "Reflection";
 const reflectionSymbol = encodeText(reflectionText, {
-  sizeId: 1,
+  sizeId: 2,
   eccLevel: "high",
   compression: "none",
 });
@@ -189,7 +189,7 @@ addSuccess(
   ["scene", "reflection", "ecc-correction"],
   reflectionScene,
   {},
-  textExpectation(reflectionText, 1, 0, 0.65),
+  textExpectation(reflectionText, 2, 0, 0.65),
 );
 
 let rotated = renderSymbol(binarySymbol.matrix, 5, 4);
@@ -205,7 +205,7 @@ for (const orientation of [90, 180, 270] as const) {
 }
 
 const perspectiveSymbol = encodeText("Perspective", {
-  sizeId: 1,
+  sizeId: 2,
   eccLevel: "high",
   compression: "none",
 });
@@ -220,12 +220,12 @@ addSuccess(
   ["perspective"],
   renderPerspective(perspectiveSymbol.matrix, 270, 195, perspectiveQuad),
   { sourceQuadrilateral: perspectiveQuad, samplesPerModule: 7 },
-  textExpectation("Perspective", 1, 0, 0.8),
+  textExpectation("Perspective", 2, 0, 0.8),
 );
 
 const automaticPerspectiveText = "Automatic perspective";
 const automaticPerspectiveSymbol = encodeText(automaticPerspectiveText, {
-  sizeId: 1,
+  sizeId: 2,
   eccLevel: "high",
   compression: "none",
 });
@@ -245,7 +245,7 @@ addSuccess(
     automaticPerspectiveQuad,
   ),
   {},
-  textExpectation(automaticPerspectiveText, 1, 0, 0.75),
+  textExpectation(automaticPerspectiveText, 2, 0, 0.75),
 );
 
 addSuccess(

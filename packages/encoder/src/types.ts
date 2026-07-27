@@ -14,7 +14,7 @@ export interface EncodeOptions {
 }
 
 export interface EncodedSymbol {
-  readonly version: 1;
+  readonly version: 2;
   readonly sizeId: SizeId;
   readonly width: number;
   readonly height: number;

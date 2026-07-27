@@ -16,7 +16,7 @@ export function validateDecoderNegativeVectorSuite(
   );
   literal(suite.format, "rectamatrix-conformance", "suite.format");
   literal(suite.vectorVersion, 1, "suite.vectorVersion");
-  literal(suite.coreVersion, 1, "suite.coreVersion");
+  literal(suite.coreVersion, 2, "suite.coreVersion");
   literal(suite.kind, "decoder-negative", "suite.kind");
   if (!Array.isArray(suite.vectors) || suite.vectors.length === 0) {
     fail("suite.vectors must be a non-empty array.");

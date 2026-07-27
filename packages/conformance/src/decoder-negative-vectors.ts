@@ -41,7 +41,7 @@ export function createDecoderNegativeVectorSuite(
   return Object.freeze({
     format: "rectamatrix-conformance",
     vectorVersion: 1,
-    coreVersion: 1,
+    coreVersion: 2,
     kind: "decoder-negative",
     vectors: Object.freeze([...vectors]),
   });

@@ -2,17 +2,17 @@
 
 [![CI](https://github.com/RectaMatrix/rectamatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/RectaMatrix/rectamatrix/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/format-candidate%201-orange.svg)](spec/RECTAMATRIX-SPEC-v1.0-EN.md)
+[![Status](https://img.shields.io/badge/format-v2%20draft-orange.svg)](spec/RECTAMATRIX-SPEC-v2-DRAFT-EN.md)
 
 **[Open the RectaMatrix live demo](https://rectamatrix.github.io/rectamatrix/apps/demo/)**
 
-RectaMatrix is an experimental rectangular binary 2D barcode with a fixed 3:2
-aspect ratio. This repository contains the format specification, the official
+RectaMatrix is an experimental rectangular binary 2D barcode with 3:2, 2:1,
+and 3:1 geometry families. This repository contains the format specification, the official
 TypeScript reference implementation, conformance vectors, examples, and an
 interactive browser demo.
 
 > [!IMPORTANT]
-> RectaMatrix is currently **Format Candidate 1**, not a stable industry
+> RectaMatrix is currently a **Version 2 working draft**, not a stable industry
 > standard. Symbols should be used together with a compatible RectaMatrix
 > decoder. Format changes remain possible before the first stable release.
 
@@ -20,8 +20,8 @@ interactive browser demo.
 
 | Property         | Current format                                           |
 | ---------------- | -------------------------------------------------------- |
-| Geometry         | Rectangular, 3:2                                         |
-| Symbol sizes     | 24×16 through 144×96 modules (Sizes 0–6)                 |
+| Geometry         | Rectangular, 3:2, 2:1, and 3:1                           |
+| Symbol sizes     | 30 geometries from 24×16 through 288×96 modules          |
 | Payloads         | Binary and strict UTF-8 text                             |
 | Error correction | Reed–Solomon over GF(256), four ECC levels               |
 | Compression      | Deterministic RM-LZ1                                     |
@@ -106,11 +106,16 @@ no npm stability promise is made yet.
 
 ## Specification and conformance
 
-The [English Version 1 specification](spec/RECTAMATRIX-SPEC-v1.0-EN.md) is
-normative. The [German specification](spec/RECTAMATRIX-SPEC-v1.0-DE.md) is an
-informative translation.
+Version 1 is retained as the documented prototype but is no longer emitted by
+the reference implementation. The active format is the experimental Version 2
+redesign. The
+[English v2 architecture draft](spec/RECTAMATRIX-SPEC-v2-DRAFT-EN.md) and its
+[German counterpart](spec/RECTAMATRIX-SPEC-v2-DRAFT-DE.md) define the proposed
+64-bit Header, high-level encoding, finer 3:2 sizes, and new 2:1 and 3:1
+geometry families. These drafts remain non-normative while RM-HLE1 and the new
+locator are completed and tested.
 
-The current suite contains 95 canonical artifacts: 38 encoder vectors, 15
+The current suite contains 164 canonical artifacts: 107 encoder vectors, 15
 positive decoder vectors, 19 negative decoder vectors, and 23 portable image
 vectors. `pnpm verify:vectors` performs byte-, bit-, and matrix-exact
 verification.

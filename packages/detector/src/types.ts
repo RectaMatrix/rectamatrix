@@ -45,7 +45,7 @@ export interface VisionScores {
 }
 
 export interface VisionSample {
-  readonly profile: "rmx-cv-1";
+  readonly profile: "rmx-v2-draft";
   readonly sizeId: SizeId;
   readonly width: number;
   readonly height: number;

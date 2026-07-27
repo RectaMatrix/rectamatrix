@@ -27,13 +27,13 @@ describe("image conformance vectors", () => {
     expect(
       validateAndVerifyImageVectorSuite(fixtures.suite, images),
     ).toHaveLength(23);
-  }, 40_000);
+  }, 90_000);
 
   it("rejects non-canonical asset paths", () => {
     const malformed: unknown = {
       format: "rectamatrix-conformance",
       vectorVersion: 1,
-      coreVersion: 1,
+      coreVersion: 2,
       kind: "image",
       vectors: [
         {

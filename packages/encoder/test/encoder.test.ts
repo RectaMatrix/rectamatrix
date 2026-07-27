@@ -1,5 +1,6 @@
 import {
   HEADER_BITS,
+  RECTAMATRIX_SIZES,
   applyHeaderWhitening,
   applyBodyMask,
   buildScanOrder,
@@ -53,8 +54,8 @@ describe("complete RectaMatrix encoding", () => {
     expect(first.matrix.every(Object.isFrozen)).toBe(true);
   });
 
-  it("supports every Version 1 geometry", () => {
-    for (const sizeId of [0, 1, 2, 3, 4, 5, 6] as const) {
+  it("supports every currently implemented Version 2 geometry", () => {
+    for (const { sizeId } of RECTAMATRIX_SIZES) {
       const symbol = encodeBytes(Uint8Array.of(1, 2, 3), {
         sizeId,
         compression: "none",
@@ -71,7 +72,7 @@ describe("complete RectaMatrix encoding", () => {
   });
 
   it("keeps the whitened Header visually balanced in every geometry", () => {
-    for (const sizeId of [0, 1, 2, 3, 4, 5, 6] as const) {
+    for (const { sizeId } of RECTAMATRIX_SIZES) {
       const symbol = encodeText("Header", {
         sizeId,
         compression: "none",
@@ -80,8 +81,8 @@ describe("complete RectaMatrix encoding", () => {
       const darkHeaderModules = buildScanOrder(getSymbolSize(sizeId))
         .slice(0, HEADER_BITS)
         .filter(({ x, y }) => symbol.matrix[y]![x]!).length;
-      expect(darkHeaderModules).toBeGreaterThanOrEqual(34);
-      expect(darkHeaderModules).toBeLessThanOrEqual(62);
+      expect(darkHeaderModules).toBeGreaterThanOrEqual(20);
+      expect(darkHeaderModules).toBeLessThanOrEqual(44);
     }
   });
 
@@ -103,25 +104,25 @@ describe("complete RectaMatrix encoding", () => {
 
   it("honors exact uncompressed capacity boundaries", () => {
     expect(
-      encodeBytes(new Uint8Array(21), {
+      encodeBytes(new Uint8Array(25), {
         sizeId: 0,
         eccLevel: "low",
         compression: "none",
       }).sizeId,
     ).toBe(0);
     expect(() =>
-      encodeBytes(new Uint8Array(22), {
+      encodeBytes(new Uint8Array(26), {
         sizeId: 0,
         eccLevel: "low",
         compression: "none",
       }),
     ).toThrow(/exceeds/i);
     expect(
-      encodeBytes(new Uint8Array(22), {
+      encodeBytes(new Uint8Array(26), {
         eccLevel: "low",
         compression: "none",
       }).sizeId,
-    ).toBe(1);
+    ).toBe(10);
   });
 
   it("writes a correct protected Header and recoverable RS Frame", () => {
@@ -135,19 +136,15 @@ describe("complete RectaMatrix encoding", () => {
     const headerBits = scan
       .slice(0, HEADER_BITS)
       .map(({ x, y }) => symbol.matrix[y]![x]!);
-    const headerBytes = readCodewordsFromBodyBits(headerBits, 12);
-    const header = decodeProtectedHeader(
-      applyHeaderWhitening(headerBytes),
-      [],
-      symbol.sizeId,
-    );
+    const headerBytes = readCodewordsFromBodyBits(headerBits, 8);
+    const header = decodeProtectedHeader(applyHeaderWhitening(headerBytes));
     expect(header.fields).toMatchObject({
       payloadType: "binary",
       compression: "none",
       eccLevel: "medium",
       maskId: symbol.maskId,
-      originalLength: input.length,
       encodedLength: input.length,
+      integrityProfile: "crc32c",
     });
 
     const layout = calculateRsLayout(input.length + 4, "medium");

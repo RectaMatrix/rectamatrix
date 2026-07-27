@@ -6,6 +6,7 @@ export * from "./errors.js";
 export * from "./generated/spec-constants.js";
 export * from "./geometry.js";
 export * from "./header.js";
+export * from "./length-prefix.js";
 export * from "./mask.js";
 export * from "./penalty.js";
 export * from "./gf256.js";
