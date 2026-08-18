@@ -106,11 +106,30 @@ describe("experimental RM-URL1", () => {
     expect(individual - absent).toBe(21);
   });
 
+  it.each([
+    ["lower", "a"],
+    ["numeric", "1"],
+    ["mixed", "A"],
+    ["ASCII escape", "["],
+  ])("round-trips compact %s run-length boundaries", (_, character) => {
+    for (const length of [1, 8, 9, 24, 25, 64]) {
+      const url = `https://example.com?${character.repeat(length)}`;
+      expect(decodeUtf8Strict(rmurl1Decode(rmurl1Encode(url)))).toBe(url);
+    }
+  });
+
+  it("selects the shorter run-length format without regressing long runs", () => {
+    expect(rmurl1EncodeDetailed("https://example.com?abc").version).toBe(1);
+    expect(
+      rmurl1EncodeDetailed(`https://example.com?${"a".repeat(64)}`).version,
+    ).toBe(0);
+  });
+
   it("switches into RM-URL1 for a URL embedded in longer text by default", () => {
     const text =
       "Open https://www.example.com/api/v1/items/123456789?lang=de now.";
     const encoded = rmhle1EncodeDetailed(text);
-    expect(encoded.bitLength).toBe(307);
+    expect(encoded.bitLength).toBe(299);
     expect(decodeUtf8Strict(rmhle1Decode(encoded.bytes))).toBe(text);
   });
 });

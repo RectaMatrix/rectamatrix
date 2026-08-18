@@ -47,6 +47,9 @@ standalone production wire codec ID.
 - dynamic programming over context-specific Path, Query, and Fragment Lower
   tables plus Numeric, Mixed, percent-byte, delimiter, and seven-bit ASCII
   representations,
+- version 0 fixed six-bit Tail run lengths and version 1 prefix-coded lengths:
+  four bits for 1–8, six bits for 9–24, and eight bits for 25–64; the encoder
+  emits whichever complete version is shorter,
 - mandatory end marker and canonical zero padding.
 
 Compound names such as `co.uk`, `com.au`, `co.in`, or `net.de` need no combined
@@ -102,3 +105,18 @@ format currently exists.
 Therefore the next compression work should investigate ha.mr's entropy coding
 and domain model without copying its service/domain corpus or its normalizing
 URL parse behavior.
+
+## Compact run-length result
+
+Replacing every fixed six-bit Tail run length with the prefix code reduced the
+five stable comparison URLs from a mean 192.6 to 188.6 meaningful bits (2.1%).
+The URL embedded in the RM-HLE1 sentence fixture fell from 307 to 299 bits.
+`https://example.com` remains unchanged because it has no Tail run. This is a
+strict format improvement for the measured fixtures.
+
+Because the prefix is two bits more expensive for lengths 25–64, the three-bit
+RM-URL1 version field makes the choice lossless: version 0 retains fixed lengths
+and version 1 uses the prefix. Both complete candidates are optimized and the
+shorter is emitted. On an identical 9,993-URL deterministic sample, 3,975 URLs
+improved, 6,018 stayed unchanged, and none regressed. Mean meaningful size fell
+from 427.1 to 423.7 bits (0.8%).

@@ -1,6 +1,7 @@
 import { RectaMatrixError } from "./errors.js";
 
-const VERSION = 0;
+const FIXED_LENGTH_VERSION = 0;
+const COMPACT_LENGTH_VERSION = 1;
 const MAXIMUM_DECODED_BYTES = 0xffff;
 const HOST_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-";
 const TAIL_LOWER_PATH = "abcdefghijklmnopqrstuvwxyz/._-?#";
@@ -69,6 +70,7 @@ export const RM_URL1_TAIL_TOKENS = Object.freeze([
 export interface RmUrl1Encoding {
   readonly bytes: Uint8Array;
   readonly bitLength: number;
+  readonly version: 0 | 1;
 }
 
 interface ParsedUrl {
@@ -86,8 +88,14 @@ export function rmurl1Encode(text: string): Uint8Array {
 
 export function rmurl1EncodeDetailed(text: string): RmUrl1Encoding {
   const parsed = parseSupportedUrl(text);
+  const fixed = encodeParsedUrl(parsed, FIXED_LENGTH_VERSION);
+  const compact = encodeParsedUrl(parsed, COMPACT_LENGTH_VERSION);
+  return compact.bitLength < fixed.bitLength ? compact : fixed;
+}
+
+function encodeParsedUrl(parsed: ParsedUrl, version: 0 | 1): RmUrl1Encoding {
   const writer = new BitWriter();
-  writer.write(VERSION, 3);
+  writer.write(version, 3);
   writer.write(parsed.secure ? 1 : 0, 1);
   writer.write(parsed.hasWww ? 1 : 0, 1);
   const domainLabelCount = parsed.labels.length - 1;
@@ -101,10 +109,11 @@ export function rmurl1EncodeDetailed(text: string): RmUrl1Encoding {
   const finalLabel = parsed.labels[domainLabelCount]!;
   writeFinalLabel(writer, finalLabel);
   writePort(writer, parsed.secure, parsed.port);
-  writeTail(writer, parsed.tail);
+  writeTail(writer, parsed.tail, version === COMPACT_LENGTH_VERSION);
   return Object.freeze({
     bytes: writer.toBytes(),
     bitLength: writer.bitLength,
+    version,
   });
 }
 
@@ -114,7 +123,7 @@ export function rmurl1Decode(input: Uint8Array): Uint8Array {
     throw new TypeError("RM-URL1 input must be a Uint8Array.");
   const reader = new BitReader(input);
   const version = reader.read(3);
-  if (version !== VERSION)
+  if (version !== FIXED_LENGTH_VERSION && version !== COMPACT_LENGTH_VERSION)
     throw invalid(`Unsupported version ${String(version)}.`);
   const secure = reader.read(1) === 1;
   const hasWww = reader.read(1) === 1;
@@ -126,7 +135,7 @@ export function rmurl1Decode(input: Uint8Array): Uint8Array {
     labels.push(readHostLabel(reader));
   labels.push(readFinalLabel(reader));
   const port = readPort(reader, secure);
-  const tail = readTail(reader);
+  const tail = readTail(reader, version === COMPACT_LENGTH_VERSION);
   assertZeroPadding(reader);
   const text = `${secure ? "https" : "http"}://${hasWww ? "www." : ""}${labels.join(".")}${port === undefined ? "" : `:${port}`}${tail}`;
   if (text.length > MAXIMUM_DECODED_BYTES)
@@ -312,24 +321,28 @@ type TailChoice =
       readonly token: number;
     };
 
-function writeTail(writer: BitWriter, tail: string): void {
-  const choices = chooseTailSegments(tail);
+function writeTail(
+  writer: BitWriter,
+  tail: string,
+  compactLengths: boolean,
+): void {
+  const choices = chooseTailSegments(tail, compactLengths);
   const states = tailStates(tail);
   for (let index = 0; index < tail.length;) {
     const choice = choices[index]!;
     const value = tail.slice(index, index + choice.length);
     if (choice.kind === "lower") {
       writer.write(0b00, 2);
-      writer.write(choice.length - 1, 6);
+      writeTailRunLength(writer, choice.length, compactLengths);
       const table = lowerTable(states[index]!);
       for (const character of value) writer.write(table.indexOf(character), 5);
     } else if (choice.kind === "numeric") {
       writer.write(0b01, 2);
-      writer.write(choice.length - 1, 6);
+      writeTailRunLength(writer, choice.length, compactLengths);
       writeNumeric(writer, value);
     } else if (choice.kind === "mixed") {
       writer.write(0b10, 2);
-      writer.write(choice.length - 1, 6);
+      writeTailRunLength(writer, choice.length, compactLengths);
       for (const character of value)
         writer.write(TAIL_MIXED.indexOf(character), 6);
     } else if (choice.kind === "percent") {
@@ -346,7 +359,7 @@ function writeTail(writer: BitWriter, tail: string): void {
       writer.write(choice.token, 4);
     } else {
       writer.write(0b11110, 5);
-      writer.write(choice.length - 1, 6);
+      writeTailRunLength(writer, choice.length, compactLengths);
       for (const character of value) writer.write(character.charCodeAt(0), 7);
     }
     index += choice.length;
@@ -354,7 +367,10 @@ function writeTail(writer: BitWriter, tail: string): void {
   writer.write(0b111111, 6);
 }
 
-function chooseTailSegments(tail: string): readonly TailChoice[] {
+function chooseTailSegments(
+  tail: string,
+  compactLengths: boolean,
+): readonly TailChoice[] {
   const best = Array<number>(tail.length + 1).fill(Number.POSITIVE_INFINITY);
   const choices = Array<TailChoice | undefined>(tail.length);
   const states = tailStates(tail);
@@ -393,12 +409,15 @@ function chooseTailSegments(tail: string): readonly TailChoice[] {
         best,
         choices,
       );
-    considerLowerTailRun(tail, index, states, best, choices);
+    considerLowerTailRun(tail, index, states, compactLengths, best, choices);
     considerTailRun(
       tail,
       index,
       "0123456789",
-      (length) => 8 + numericPayloadBits(length),
+      (length) =>
+        2 +
+        tailRunLengthBits(length, compactLengths) +
+        numericPayloadBits(length),
       "numeric",
       best,
       choices,
@@ -407,7 +426,7 @@ function chooseTailSegments(tail: string): readonly TailChoice[] {
       tail,
       index,
       TAIL_MIXED,
-      (length) => 8 + length * 6,
+      (length) => 2 + tailRunLengthBits(length, compactLengths) + length * 6,
       "mixed",
       best,
       choices,
@@ -419,7 +438,10 @@ function chooseTailSegments(tail: string): readonly TailChoice[] {
     ) {
       chooseTail(
         index,
-        11 + length * 7 + best[index + length]!,
+        5 +
+          tailRunLengthBits(length, compactLengths) +
+          length * 7 +
+          best[index + length]!,
         { kind: "ascii", length },
         best,
         choices,
@@ -433,6 +455,7 @@ function considerLowerTailRun(
   tail: string,
   index: number,
   states: readonly TailState[],
+  compactLengths: boolean,
   best: number[],
   choices: (TailChoice | undefined)[],
 ): void {
@@ -447,7 +470,10 @@ function considerLowerTailRun(
     if (!alphabet.includes(tail[index + length - 1]!)) break;
     chooseTail(
       index,
-      8 + length * 5 + best[index + length]!,
+      2 +
+        tailRunLengthBits(length, compactLengths) +
+        length * 5 +
+        best[index + length]!,
       { kind: "lower", length },
       best,
       choices,
@@ -493,13 +519,13 @@ function chooseTail(
   }
 }
 
-function readTail(reader: BitReader): string {
+function readTail(reader: BitReader, compactLengths: boolean): string {
   let tail = "";
   let state: TailState = "path";
   for (;;) {
     const first = reader.read(2);
     if (first === 0b00) {
-      const length = reader.read(6) + 1;
+      const length = readTailRunLength(reader, compactLengths);
       const table = lowerTable(state);
       for (let index = 0; index < length; index += 1) {
         const character = table[reader.read(5)]!;
@@ -507,9 +533,9 @@ function readTail(reader: BitReader): string {
         state = nextTailState(state, character);
       }
     } else if (first === 0b01) {
-      tail += readNumeric(reader, reader.read(6) + 1);
+      tail += readNumeric(reader, readTailRunLength(reader, compactLengths));
     } else if (first === 0b10) {
-      const length = reader.read(6) + 1;
+      const length = readTailRunLength(reader, compactLengths);
       for (let index = 0; index < length; index += 1)
         tail += TAIL_MIXED[reader.read(6)]!;
     } else {
@@ -534,7 +560,7 @@ function readTail(reader: BitReader): string {
         } else {
           const terminal = reader.read(1);
           if (terminal === 0) {
-            const length = reader.read(6) + 1;
+            const length = readTailRunLength(reader, compactLengths);
             for (let index = 0; index < length; index += 1) {
               const character = String.fromCharCode(reader.read(7));
               tail += character;
@@ -574,6 +600,43 @@ function lowerTable(state: TailState): string {
   if (state === "query") return TAIL_LOWER_QUERY;
   if (state === "fragment") return TAIL_LOWER_FRAGMENT;
   return TAIL_LOWER_PATH;
+}
+
+function tailRunLengthBits(length: number, compactLengths: boolean): number {
+  if (!compactLengths) return 6;
+  if (length <= 8) return 4;
+  if (length <= 24) return 6;
+  return 8;
+}
+
+function writeTailRunLength(
+  writer: BitWriter,
+  length: number,
+  compactLengths: boolean,
+): void {
+  if (length < 1 || length > MAXIMUM_TAIL_RUN)
+    throw new RangeError("RM-URL1 tail run length is out of range.");
+  if (!compactLengths) {
+    writer.write(length - 1, 6);
+  } else if (length <= 8) {
+    writer.write(length - 1, 4);
+  } else if (length <= 24) {
+    writer.write(0b10, 2);
+    writer.write(length - 9, 4);
+  } else {
+    writer.write(0b11, 2);
+    writer.write(length - 25, 6);
+  }
+}
+
+function readTailRunLength(reader: BitReader, compactLengths: boolean): number {
+  if (!compactLengths) return reader.read(6) + 1;
+  if (reader.read(1) === 0) return reader.read(3) + 1;
+  if (reader.read(1) === 0) return reader.read(4) + 9;
+  const length = reader.read(6) + 25;
+  if (length > MAXIMUM_TAIL_RUN)
+    throw invalid("Tail run length exceeds the canonical maximum.");
+  return length;
 }
 
 function writeNumeric(writer: BitWriter, digits: string): void {
