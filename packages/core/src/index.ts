@@ -14,5 +14,6 @@ export * from "./gf256-polynomial.js";
 export * from "./reed-solomon.js";
 export * from "./rmlz1.js";
 export * from "./rmhle1.js";
+export * from "./rmurl1.js";
 export * from "./types.js";
 export * from "./utf8.js";
