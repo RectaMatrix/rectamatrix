@@ -190,6 +190,8 @@ RM-HLE1 is a bit-packed, lossless high-level stream. It supports at least:
 * Upper Text: common upper-case letters and punctuation through compact tables,
 * URL Tokens: a small normative table of common language-neutral prefixes and
   separators,
+* Web URL: a byte-padded RM-URL1 substream for an exact HTTP(S) URL embedded in
+  otherwise general text,
 * Byte Shift: arbitrary byte sequences,
 * UTF-8 Fallback: complete Unicode without loss,
 * End of Data.
@@ -208,10 +210,17 @@ three-bit opcode:
 | `100` | Upper | 8-bit `characterCount - 1`, then 5-bit table values |
 | `101` | URL Token | one 4-bit token index |
 | `110` | Byte | 8-bit `byteCount - 1`, then literal bytes |
-| `111` | reserved | invalid in v2 Core |
+| `111` | Web URL | 8-bit `encodedByteCount - 1`, then an RM-URL1 substream |
 
 Counted segments contain 1 through 256 characters or bytes. End of Data is
 mandatory. Remaining bits through the final byte boundary MUST be zero.
+
+Web URL contains 1 through 256 bytes of byte-aligned RM-URL1 data. Its decoded
+URL is appended to the surrounding text without an implicit separator. An
+encoder SHOULD select this segment only when it is shorter than the ordinary
+RM-HLE1 representation. Consequently, RM-HLE1 can enter and leave structured
+URL coding at arbitrary character boundaries while remaining a general Unicode
+text codec.
 
 Numeric stores each complete group of three digits as its integer value in ten
 bits. A final pair uses seven bits and a final single digit uses four bits.

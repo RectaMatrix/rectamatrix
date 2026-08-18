@@ -1,4 +1,5 @@
 import { RectaMatrixError } from "./errors.js";
+import { rmurl1Decode, rmurl1EncodeDetailed } from "./rmurl1.js";
 import { encodeUtf8Strict } from "./utf8.js";
 
 const END = 0b000;
@@ -8,8 +9,11 @@ const LOWER = 0b011;
 const UPPER = 0b100;
 const URL_TOKEN = 0b101;
 const BYTE = 0b110;
+const EMBEDDED_URL = 0b111;
 const MAXIMUM_SEGMENT_LENGTH = 256;
 const MAXIMUM_DECODED_BYTES = 0xffff;
+const HTTP_PREFIX = Array.from("http://");
+const HTTPS_PREFIX = Array.from("https://");
 
 export const RM_HLE1_ALPHANUMERIC_TABLE =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
@@ -43,6 +47,7 @@ interface Choice {
   readonly opcode: number;
   readonly length: number;
   readonly tokenIndex?: number;
+  readonly encodedUrl?: Uint8Array;
 }
 
 /** Encodes strict Unicode text using the deterministic RM-HLE1 v2 draft. */
@@ -51,6 +56,10 @@ export function rmhle1Encode(text: string): Uint8Array {
 }
 
 export function rmhle1EncodeDetailed(text: string): RmHle1Encoding {
+  return encodeRmHle1Detailed(text);
+}
+
+function encodeRmHle1Detailed(text: string): RmHle1Encoding {
   if (typeof text !== "string") {
     throw new TypeError("RM-HLE1 input must be a string.");
   }
@@ -64,6 +73,7 @@ export function rmhle1EncodeDetailed(text: string): RmHle1Encoding {
   best[characters.length] = 3;
 
   for (let index = characters.length - 1; index >= 0; index -= 1) {
+    considerEmbeddedUrls(characters, index, best, choices);
     considerUrlTokens(characters, index, best, choices);
     considerTableMode(
       characters,
@@ -126,7 +136,10 @@ export function rmhle1EncodeDetailed(text: string): RmHle1Encoding {
       throw new Error("Internal RM-HLE1 optimizer failure.");
     }
     writer.write(choice.opcode, 3);
-    if (choice.opcode === URL_TOKEN) {
+    if (choice.opcode === EMBEDDED_URL) {
+      writer.write(choice.encodedUrl!.length - 1, 8);
+      for (const byte of choice.encodedUrl!) writer.write(byte, 8);
+    } else if (choice.opcode === URL_TOKEN) {
       writer.write(choice.tokenIndex!, 4);
     } else {
       writeSegment(writer, characters, utf8, index, choice);
@@ -142,6 +155,10 @@ export function rmhle1EncodeDetailed(text: string): RmHle1Encoding {
 
 /** Decodes an RM-HLE1 stream and enforces canonical zero padding. */
 export function rmhle1Decode(input: Uint8Array): Uint8Array {
+  return decodeRmHle1(input);
+}
+
+function decodeRmHle1(input: Uint8Array): Uint8Array {
   if (!(input instanceof Uint8Array)) {
     throw new TypeError("RM-HLE1 input must be a Uint8Array.");
   }
@@ -160,7 +177,15 @@ export function rmhle1Decode(input: Uint8Array): Uint8Array {
       enforceOutputLimit(output.length);
       continue;
     }
-    if (opcode === 0b111) throw invalid("Reserved segment opcode.");
+    if (opcode === EMBEDDED_URL) {
+      const length = reader.read(8) + 1;
+      const encoded = new Uint8Array(length);
+      for (let index = 0; index < length; index += 1)
+        encoded[index] = reader.read(8);
+      output.push(...rmurl1Decode(encoded));
+      enforceOutputLimit(output.length);
+      continue;
+    }
     const length = reader.read(8) + 1;
     if (opcode === NUMERIC) {
       decodeNumeric(reader, length, output);
@@ -181,6 +206,45 @@ export function rmhle1Decode(input: Uint8Array): Uint8Array {
     enforceOutputLimit(output.length);
   }
   throw invalid("End marker is missing.");
+}
+
+function considerEmbeddedUrls(
+  characters: readonly string[],
+  index: number,
+  best: number[],
+  choices: (Choice | undefined)[],
+): void {
+  const startsWithHttp = HTTP_PREFIX.every(
+    (character, offset) => characters[index + offset] === character,
+  );
+  const startsWithHttps = HTTPS_PREFIX.every(
+    (character, offset) => characters[index + offset] === character,
+  );
+  if (!startsWithHttp && !startsWithHttps) return;
+  const remainder = characters.slice(index).join("");
+  let maximumLength = 0;
+  while (
+    maximumLength < remainder.length &&
+    maximumLength < MAXIMUM_DECODED_BYTES &&
+    !/\s/.test(remainder[maximumLength]!)
+  )
+    maximumLength += 1;
+  const minimumLength = startsWithHttps ? 9 : 8;
+  for (let length = minimumLength; length <= maximumLength; length += 1) {
+    try {
+      const encoded = rmurl1EncodeDetailed(remainder.slice(0, length)).bytes;
+      if (encoded.length > MAXIMUM_SEGMENT_LENGTH) break;
+      choose(
+        index,
+        11 + encoded.length * 8 + best[index + length]!,
+        { opcode: EMBEDDED_URL, length, encodedUrl: encoded },
+        best,
+        choices,
+      );
+    } catch {
+      // Unsupported prefixes remain eligible for ordinary RM-HLE1 modes.
+    }
+  }
 }
 
 function considerUrlTokens(
