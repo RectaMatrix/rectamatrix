@@ -1,5 +1,9 @@
 import { RectaMatrixError } from "./errors.js";
-import { rmurl1Decode, rmurl1EncodeDetailed } from "./rmurl1.js";
+import {
+  rmurl1DecodeFromBits,
+  rmurl1EncodeDetailed,
+  type RmUrl1Encoding,
+} from "./rmurl1.js";
 import { encodeUtf8Strict } from "./utf8.js";
 
 const END = 0b000;
@@ -47,7 +51,7 @@ interface Choice {
   readonly opcode: number;
   readonly length: number;
   readonly tokenIndex?: number;
-  readonly encodedUrl?: Uint8Array;
+  readonly encodedUrl?: RmUrl1Encoding;
 }
 
 /** Encodes strict Unicode text using the deterministic RM-HLE1 v2 draft. */
@@ -137,8 +141,7 @@ function encodeRmHle1Detailed(text: string): RmHle1Encoding {
     }
     writer.write(choice.opcode, 3);
     if (choice.opcode === EMBEDDED_URL) {
-      writer.write(choice.encodedUrl!.length - 1, 8);
-      for (const byte of choice.encodedUrl!) writer.write(byte, 8);
+      writeEncodedBits(writer, choice.encodedUrl!);
     } else if (choice.opcode === URL_TOKEN) {
       writer.write(choice.tokenIndex!, 4);
     } else {
@@ -178,11 +181,12 @@ function decodeRmHle1(input: Uint8Array): Uint8Array {
       continue;
     }
     if (opcode === EMBEDDED_URL) {
-      const length = reader.read(8) + 1;
-      const encoded = new Uint8Array(length);
-      for (let index = 0; index < length; index += 1)
-        encoded[index] = reader.read(8);
-      output.push(...rmurl1Decode(encoded));
+      try {
+        output.push(...rmurl1DecodeFromBits(reader));
+      } catch (error) {
+        const detail = error instanceof Error ? `: ${error.message}` : ".";
+        throw invalid(`Web URL segment is invalid${detail}`);
+      }
       enforceOutputLimit(output.length);
       continue;
     }
@@ -232,11 +236,10 @@ function considerEmbeddedUrls(
   const minimumLength = startsWithHttps ? 9 : 8;
   for (let length = minimumLength; length <= maximumLength; length += 1) {
     try {
-      const encoded = rmurl1EncodeDetailed(remainder.slice(0, length)).bytes;
-      if (encoded.length > MAXIMUM_SEGMENT_LENGTH) break;
+      const encoded = rmurl1EncodeDetailed(remainder.slice(0, length));
       choose(
         index,
-        11 + encoded.length * 8 + best[index + length]!,
+        3 + encoded.bitLength + best[index + length]!,
         { opcode: EMBEDDED_URL, length, encodedUrl: encoded },
         best,
         choices,
@@ -244,6 +247,13 @@ function considerEmbeddedUrls(
     } catch {
       // Unsupported prefixes remain eligible for ordinary RM-HLE1 modes.
     }
+  }
+}
+
+function writeEncodedBits(writer: BitWriter, encoding: RmUrl1Encoding): void {
+  for (let offset = 0; offset < encoding.bitLength; offset += 1) {
+    const byte = encoding.bytes[Math.floor(offset / 8)]!;
+    writer.write((byte >>> (7 - (offset % 8))) & 1, 1);
   }
 }
 

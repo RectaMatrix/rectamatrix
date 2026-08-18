@@ -73,6 +73,12 @@ export interface RmUrl1Encoding {
   readonly version: 0 | 1;
 }
 
+/** Minimal bit-reader contract used by the inline RM-HLE Web URL segment. */
+export interface RmUrl1BitReader {
+  readonly remaining: number;
+  read(width: number): number;
+}
+
 interface ParsedUrl {
   readonly secure: boolean;
   readonly hasWww: boolean;
@@ -122,6 +128,13 @@ export function rmurl1Decode(input: Uint8Array): Uint8Array {
   if (!(input instanceof Uint8Array))
     throw new TypeError("RM-URL1 input must be a Uint8Array.");
   const reader = new BitReader(input);
+  const output = rmurl1DecodeFromBits(reader);
+  assertZeroPadding(reader);
+  return output;
+}
+
+/** Decodes one self-terminating RM-URL stream from a surrounding bitstream. */
+export function rmurl1DecodeFromBits(reader: RmUrl1BitReader): Uint8Array {
   const version = reader.read(3);
   if (version !== FIXED_LENGTH_VERSION && version !== COMPACT_LENGTH_VERSION)
     throw invalid(`Unsupported version ${String(version)}.`);
@@ -136,7 +149,6 @@ export function rmurl1Decode(input: Uint8Array): Uint8Array {
   labels.push(readFinalLabel(reader));
   const port = readPort(reader, secure);
   const tail = readTail(reader, version === COMPACT_LENGTH_VERSION);
-  assertZeroPadding(reader);
   const text = `${secure ? "https" : "http"}://${hasWww ? "www." : ""}${labels.join(".")}${port === undefined ? "" : `:${port}`}${tail}`;
   if (text.length > MAXIMUM_DECODED_BYTES)
     throw invalid("Decoded Payload is too large.");
@@ -222,7 +234,7 @@ function writeHostLabel(writer: BitWriter, label: string): void {
   }
 }
 
-function readHostLabel(reader: BitReader): string {
+function readHostLabel(reader: RmUrl1BitReader): string {
   const length = reader.read(6) + 1;
   let label = "";
   for (let index = 0; index < length; index += 2) {
@@ -256,7 +268,7 @@ function writeFinalLabel(writer: BitWriter, label: string): void {
   }
 }
 
-function readFinalLabel(reader: BitReader): string {
+function readFinalLabel(reader: RmUrl1BitReader): string {
   const first = reader.read(2);
   if (first === 0b00) return RM_URL1_TLDS[0];
   if (first === 0b01) return RM_URL1_TLDS[reader.read(1) + 1]!;
@@ -290,7 +302,10 @@ function writePort(
   }
 }
 
-function readPort(reader: BitReader, secure: boolean): string | undefined {
+function readPort(
+  reader: RmUrl1BitReader,
+  secure: boolean,
+): string | undefined {
   if (reader.read(1) === 0) return undefined;
   if (reader.read(1) === 0) return secure ? "443" : "80";
   if (reader.read(1) === 0) return "8080";
@@ -519,7 +534,7 @@ function chooseTail(
   }
 }
 
-function readTail(reader: BitReader, compactLengths: boolean): string {
+function readTail(reader: RmUrl1BitReader, compactLengths: boolean): string {
   let tail = "";
   let state: TailState = "path";
   for (;;) {
@@ -629,7 +644,10 @@ function writeTailRunLength(
   }
 }
 
-function readTailRunLength(reader: BitReader, compactLengths: boolean): number {
+function readTailRunLength(
+  reader: RmUrl1BitReader,
+  compactLengths: boolean,
+): number {
   if (!compactLengths) return reader.read(6) + 1;
   if (reader.read(1) === 0) return reader.read(3) + 1;
   if (reader.read(1) === 0) return reader.read(4) + 9;
@@ -649,7 +667,7 @@ function writeNumeric(writer: BitWriter, digits: string): void {
   }
 }
 
-function readNumeric(reader: BitReader, length: number): string {
+function readNumeric(reader: RmUrl1BitReader, length: number): string {
   let output = "";
   for (let index = 0; index < length; index += 3) {
     const remaining = Math.min(3, length - index);
@@ -672,7 +690,7 @@ function applyHexCase(character: string, lower: boolean): string {
   return lower ? character.toLowerCase() : character.toUpperCase();
 }
 
-function assertZeroPadding(reader: BitReader): void {
+function assertZeroPadding(reader: RmUrl1BitReader): void {
   while (reader.remaining > 0)
     if (reader.read(1) !== 0) throw invalid("Padding bits must be zero.");
 }

@@ -129,7 +129,14 @@ describe("experimental RM-URL1", () => {
     const text =
       "Open https://www.example.com/api/v1/items/123456789?lang=de now.";
     const encoded = rmhle1EncodeDetailed(text);
-    expect(encoded.bitLength).toBe(299);
+    expect(encoded.bitLength).toBe(289);
+    expect(decodeUtf8Strict(rmhle1Decode(encoded.bytes))).toBe(text);
+  });
+
+  it("returns from multiple unpadded URL bitstreams to ordinary text", () => {
+    const text =
+      "First https://example.de/a?x=1, then http://www.example.org:8080/b#c done.";
+    const encoded = rmhle1EncodeDetailed(text);
     expect(decodeUtf8Strict(rmhle1Decode(encoded.bytes))).toBe(text);
   });
 });

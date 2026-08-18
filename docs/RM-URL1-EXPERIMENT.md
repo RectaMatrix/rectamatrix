@@ -29,12 +29,13 @@ and percent-escape letter case exactly. The optimized subset currently requires:
 These are optimization eligibility rules, not restrictions on RectaMatrix
 payloads. Other values use the general codecs.
 
-RM-HLE1 can switch from ordinary text segments into byte-padded RM-URL1
-segments and back with opcode `111`. The dynamic-programming encoder chooses
-that segment only when the complete nested representation is cheaper. This
-makes URL coding useful inside longer text without turning RectaMatrix into a
-URL-only format. The v2 format is still a draft; RM-URL1 does not yet have a
-standalone production wire codec ID.
+RM-HLE1 can switch from ordinary text segments directly into a self-terminating
+RM-URL1 bitstream and back with opcode `111`. There is no nested byte length and
+no internal padding. The dynamic-programming encoder chooses that segment only
+when the complete representation is cheaper. This makes URL coding useful
+inside longer text without turning RectaMatrix into a URL-only format. The v2
+format is still a draft; RM-URL1 does not have or require a standalone
+production wire codec ID.
 
 ## Coding structure
 
@@ -110,7 +111,8 @@ URL parse behavior.
 
 Replacing every fixed six-bit Tail run length with the prefix code reduced the
 five stable comparison URLs from a mean 192.6 to 188.6 meaningful bits (2.1%).
-The URL embedded in the RM-HLE1 sentence fixture fell from 307 to 299 bits.
+The URL embedded in the RM-HLE1 sentence fixture initially fell from 307 to 299
+bits and now needs 289 bits after removal of its byte-count field and padding.
 `https://example.com` remains unchanged because it has no Tail run. This is a
 strict format improvement for the measured fixtures.
 
